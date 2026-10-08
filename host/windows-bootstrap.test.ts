@@ -93,7 +93,7 @@ function Expand-Archive([string] $LiteralPath, [string] $DestinationPath) {
 `;
   const script = readFileSync("src-tauri/src/remote_bootstrap.ps1", "utf8")
     .replace(
-      "$base = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.monocode-host'",
+      "$base = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.luxecode-host'",
       `$base = ${psQuote(base)}`,
     )
     .replace("@@VERSION@@", psQuote(version))
@@ -115,7 +115,7 @@ function Expand-Archive([string] $LiteralPath, [string] $DestinationPath) {
       run(launch, {
         PROCESSOR_ARCHITECTURE: "AMD64",
         MONOCODE_TEST_EVENTS: events,
-        MONOCODE_HOST_FORCE_UPGRADE: forceUpgrade ? "1" : "0",
+        LUXECODE_HOST_FORCE_UPGRADE: forceUpgrade ? "1" : "0",
       }),
   };
 }
@@ -126,7 +126,7 @@ it.skipIf(!shell)(
     const fixture = await install(false);
     const result = await fixture.run();
     expect(JSON.parse(result.stdout)).toEqual({ port: 3774, pid: 123 });
-    expect(existsSync(join(fixture.base, "bin", "monocode-host.cmd"))).toBe(
+    expect(existsSync(join(fixture.base, "bin", "luxecode-host.cmd"))).toBe(
       true,
     );
     const pointer = readFileSync(join(fixture.base, "runtime-path"), "utf8");
@@ -138,7 +138,7 @@ it.skipIf(!shell)(
       readFileSync(fixture.downloads, "utf8").trim().split(/\r?\n/),
     ).toHaveLength(2);
     if (windows) {
-      const launcher = join(fixture.base, "bin", "monocode-host.cmd");
+      const launcher = join(fixture.base, "bin", "luxecode-host.cmd");
       const versionResult = await run(
         `& ${psQuote(launcher)} --version; if ($LASTEXITCODE -ne 0) { exit 1 }`,
       );

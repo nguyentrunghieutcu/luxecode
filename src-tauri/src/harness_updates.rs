@@ -46,10 +46,21 @@ pub fn harness_update_check_claim() -> bool {
 }
 
 #[tauri::command]
-pub async fn harness_latest_version(provider: String) -> Result<String, String> {
+pub async fn harness_latest_version(
+    provider: String,
+    command: Option<String>,
+    binary_path: Option<String>,
+) -> Result<String, String> {
     let package =
         npm_package(&provider).ok_or_else(|| format!("No update feed for harness: {provider}"))?;
     tauri::async_runtime::spawn_blocking(move || {
+        if provider == "codex" {
+            let command = command.ok_or("No resolved Codex binary for update check")?;
+            if !is_resolved_harness_binary(&command, Some(&provider), binary_path.as_deref()) {
+                return Err("harness_latest_version: not a resolved harness CLI".to_string());
+            }
+            ensure_updatable_binary(&provider, &command)?;
+        }
         let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
         let text = agent
             .get(&format!("{REGISTRY_URL}/{package}/latest"))
@@ -85,6 +96,7 @@ pub async fn harness_update(
         if !is_resolved_harness_binary(&command, Some(&binary_provider), binary_path.as_deref()) {
             return Err("harness_update: not a resolved harness CLI".to_string());
         }
+        ensure_updatable_binary(&binary_provider, &command)?;
         let output = exec_output(&command, &args, None, UPDATE_TIMEOUT)?;
         if output.status.success() {
             return Ok(());
@@ -116,6 +128,29 @@ fn latest_version(body: &Value) -> Option<String> {
     (!version.is_empty()).then(|| version.to_string())
 }
 
+fn ensure_updatable_binary(provider: &str, command: &str) -> Result<(), String> {
+    if provider != "codex" {
+        return Ok(());
+    }
+    let path = std::path::Path::new(command);
+    let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    if let Some(bundle) = resolved
+        .ancestors()
+        .filter(|parent| {
+            parent
+                .extension()
+                .is_some_and(|extension| extension == "app")
+        })
+        .last()
+    {
+        let name = bundle.file_name().unwrap_or_default().to_string_lossy();
+        return Err(format!(
+            "Codex is bundled with {name} and cannot self-update. Update that application, or select a standalone Codex CLI in provider settings."
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,6 +169,46 @@ mod tests {
         assert_eq!(update_args("pi"), Some(&["update", "--self"][..]));
         assert_eq!(update_args("opencode"), Some(&["upgrade"][..]));
         assert_eq!(update_args("cursor"), None);
+    }
+
+    #[test]
+    fn rejects_app_bundled_codex_updates() {
+        for command in [
+            "/Applications/Codex.app/Contents/Resources/codex",
+            "/Users/test/Applications/Codex.app/Contents/Resources/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        ] {
+            let error = ensure_updatable_binary("codex", command).unwrap_err();
+            assert!(error.contains("bundled with"), "{error}");
+            assert!(error.contains("Update that application"), "{error}");
+        }
+    }
+
+    #[test]
+    fn allows_standalone_codex_updates() {
+        for command in [
+            "/opt/homebrew/bin/codex",
+            "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+            "/Users/test/.local/bin/codex",
+            "/Users/test/apps/codex",
+        ] {
+            assert!(ensure_updatable_binary("codex", command).is_ok());
+        }
+        assert!(ensure_updatable_binary("claude", "/Applications/Test.app/claude").is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinks_to_app_bundled_codex() {
+        let root = std::env::temp_dir().join(format!("codex-update-{}", uuid::Uuid::new_v4()));
+        let bundled = root.join("ChatGPT.app/Contents/MacOS/codex");
+        std::fs::create_dir_all(bundled.parent().unwrap()).unwrap();
+        std::fs::write(&bundled, b"").unwrap();
+        let link = root.join("codex");
+        std::os::unix::fs::symlink(&bundled, &link).unwrap();
+        let result = ensure_updatable_binary("codex", link.to_str().unwrap());
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(result.unwrap_err().contains("ChatGPT.app"));
     }
 
     #[test]

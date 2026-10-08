@@ -1,11 +1,12 @@
 import { homeDir } from "../../../../platform/tauri/fs";
+import { gatewayModel, listGatewayProfiles } from "../../../../features/providers/model/gatewayProfiles";
 import {
   setHarnessModels,
   type AgentModel,
   type ModelSetting,
   type ModelSettingChoice,
 } from "../../../../features/sessions/model/models";
-import { execChild, resolveOpenCodeBinary } from "../../core/child";
+import { execChild, hasHeadlessChildBackend, resolveOpenCodeBinary } from "../../core/child";
 import {
   compareSemver,
   inferDefaultAgent,
@@ -74,7 +75,7 @@ export async function discoverOpenCodeModels(
   const version = parseOpenCodeVersion(versionOut);
   if (!version) {
     throw new Error(
-      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
+      `Unable to determine OpenCode version. LuxeCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
     );
   }
   if (compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {
@@ -83,12 +84,16 @@ export async function discoverOpenCodeModels(
     );
   }
 
+  const profiles = hasHeadlessChildBackend() ? [] : await listGatewayProfiles();
   const modelsOut = await execChild(
     path,
     ["models", "--verbose"],
     cwd,
     "opencode",
-  );
+  ).catch((error: unknown) => {
+    if (profiles.length === 0) throw error;
+    return "";
+  });
   const parsed = parseModelsCliOutput(modelsOut);
   let agents: OpenCodeAgent[] = [];
   try {
@@ -97,7 +102,7 @@ export async function discoverOpenCodeModels(
   } catch (error) {
     console.debug("[monocode] opencode agents", error);
   }
-  return flattenOpenCodeModels(parsed, agents);
+  return [...flattenOpenCodeModels(parsed, agents), ...profiles.map(gatewayModel)];
 }
 
 export function parseModelsCliOutput(stdout: string): {

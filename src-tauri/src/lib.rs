@@ -10,6 +10,8 @@ pub mod control_cli;
 mod cursor_store;
 mod external_editor;
 mod fs;
+mod gateway;
+mod gateway_profiles;
 mod gitlab;
 mod harness;
 mod harness_updates;
@@ -449,6 +451,10 @@ pub fn run() {
             harness_updates::harness_latest_version,
             harness_updates::harness_update_check_claim,
             harness_updates::harness_update,
+            gateway_profiles::gateway_profiles,
+            gateway_profiles::gateway_test,
+            gateway_profiles::gateway_create,
+            gateway_profiles::gateway_rotate_key,
             harness::provider_account_remove,
             account_identity::provider_account_identity,
             pi_usage::fetch_pi_usage,
@@ -550,7 +556,7 @@ pub fn run() {
             project_logo::forget_logo_file,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building MonoCode");
+        .expect("error while building LuxeCode");
 
     app.run(|handle, event| match event {
         #[cfg(target_os = "macos")]

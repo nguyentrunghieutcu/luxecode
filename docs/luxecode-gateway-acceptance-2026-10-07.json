@@ -1,0 +1,307 @@
+{
+  "status": "PARTIAL",
+  "scope_status": "PASS",
+  "date": "2026-10-07",
+  "scope": "P1 local native/CLI smoke + real desktop supervised allow/deny, running-command cancellation, partial-stream transport error and same-conversation reconnect; not full release acceptance",
+  "stack_detected": "mixed",
+  "versions": {
+    "gateway": "9router 0.5.95",
+    "engine": "OpenCode 1.18.35",
+    "application": "LuxeCode 0.8.0"
+  },
+  "profile": {
+    "path": "<USER_HOME>/.config/luxecode/gateway-poc.json",
+    "endpoint": "http://127.0.0.1:20128/v1",
+    "model": "PER",
+    "contextWindow": 32768,
+    "maxOutputTokens": 8192,
+    "mode": "0600",
+    "contains_secret": false
+  },
+  "auth_detected": {
+    "type": "api-key",
+    "evidence": [
+      "Live inference without key returned 401",
+      "Live inference with invalid key returned 401",
+      "Existing dashboard key used only for process environment; no gateway key created or changed"
+    ]
+  },
+  "coverage": {
+    "endpoints": 2,
+    "cases": 17,
+    "passed": 17,
+    "failed": 0,
+    "blocked": 0
+  },
+  "cases": [
+    {
+      "name": "empty key blocks engine launch",
+      "result": "PASS"
+    },
+    {
+      "name": "invalid key blocks engine launch",
+      "result": "PASS"
+    },
+    {
+      "name": "key without profile blocks engine launch",
+      "result": "PASS"
+    },
+    {
+      "name": "fixture native catalog/tools/follow-up/restart/resume/config-session isolation",
+      "result": "PASS"
+    },
+    {
+      "name": "runtime 401",
+      "result": "PASS",
+      "evidence": "error surfaced; no successful fallback"
+    },
+    {
+      "name": "runtime 429",
+      "result": "PASS",
+      "evidence": "cancelled process group after 12 seconds while retry pending; no successful fallback"
+    },
+    {
+      "name": "runtime 503",
+      "result": "PASS",
+      "evidence": "cancelled process group after 12 seconds while retry pending; no successful fallback"
+    },
+    {
+      "name": "runtime timeout",
+      "result": "PASS",
+      "evidence": "cancelled pending request; no successful fallback"
+    },
+    {
+      "name": "runtime partial stream",
+      "result": "PASS",
+      "evidence": "cancelled pending stream; no successful fallback"
+    },
+    {
+      "name": "live inference without key",
+      "result": "PASS",
+      "http_status": 401
+    },
+    {
+      "name": "live inference with invalid key",
+      "result": "PASS",
+      "http_status": 401
+    },
+    {
+      "name": "live PER native catalog/tools/follow-up/restart/resume",
+      "result": "PASS",
+      "evidence": "Only luxecode/PER in catalog; read/edit/bash tools completed, result.txt changed before → after in a temporary project; external OpenCode config/session hashes unchanged"
+    },
+    {
+      "name": "supervised_allow_edit",
+      "result": "PASS",
+      "evidence": "GUI displayed Waiting for approval and diff; file unchanged before Allow; after Allow the edit tool executed"
+    },
+    {
+      "name": "supervised_deny_edit",
+      "result": "PASS",
+      "evidence": "GUI displayed the edit diff and Deny; clicking Deny returned the composer to Send and did not change the file; expanded failed tool explicitly showed The user rejected permission to use this specific tool call."
+    },
+    {
+      "name": "stop_running_command",
+      "result": "PASS",
+      "evidence": "GUI Stop returned to Send; sentinel still before-cancel more than 90 seconds after a write scheduled for 30 seconds; no late completion appeared"
+    },
+    {
+      "name": "partial_stream_transport_error",
+      "result": "PASS",
+      "evidence": "GUI displayed STREAM_BEGIN_2 and at least 37 STREAM_PROBE lines while Stop remained available; terminated only the disposable-project OpenCode serve child; GUI displayed OpenCode event stream ended unexpectedly. and returned to disabled Send after 21 seconds."
+    },
+    {
+      "name": "same_conversation_reconnect",
+      "result": "PASS",
+      "evidence": "Sent recovery prompt in the same GUI command cancellation test conversation; a new isolated engine child started in the same temporary project; GUI displayed GUI_RECONNECT_OK and returned to disabled Send; prior turns remained in history."
+    }
+  ],
+  "desktop": {
+    "state": "RUNNING_WITH_GATEWAY_ENVIRONMENT",
+    "private_engine": "<USER_HOME>/Library/Application Support/com.luxecode.desktop/engine/bin/opencode",
+    "binary_path_saved": true,
+    "default_provider": "opencode",
+    "current_model": "luxecode/PER",
+    "approval_mode": "Supervised",
+    "evidence": [
+      "Settings → Providers: OpenCode has 1 model available, PER",
+      "Model picker: only PER under Luxecode for OpenCode",
+      "Composer: OpenCode · Luxecode · PER; Supervised unchanged",
+      "Real temporary-project Supervised Allow/Deny and running-command Stop passed",
+      "Partial stream interruption visibly failed; next turn in the same conversation reconnected and returned GUI_RECONNECT_OK"
+    ],
+    "gui_acceptance": {
+      "date": "2026-10-07",
+      "project": "<TEMP_DIR>/luxecode-gui-acceptance-20261007",
+      "cases": [
+        {
+          "name": "supervised_allow_edit",
+          "file": "approval-allow.txt",
+          "before": "before-allow\n",
+          "after": "after-allow\n",
+          "passed": true,
+          "evidence": "GUI displayed Waiting for approval and diff; file unchanged before Allow; after Allow the edit tool executed"
+        },
+        {
+          "name": "supervised_deny_edit",
+          "file": "approval-deny.txt",
+          "before": "before-deny\n",
+          "after": "before-deny\n",
+          "passed": true,
+          "evidence": "GUI displayed the edit diff and Deny; clicking Deny returned the composer to Send and did not change the file; expanded failed tool explicitly showed The user rejected permission to use this specific tool call."
+        },
+        {
+          "name": "stop_running_command",
+          "file": "cancel.txt",
+          "before": "before-cancel\n",
+          "after": "before-cancel\n",
+          "passed": true,
+          "command": "sleep 30; printf after-cancel > cancel.txt",
+          "stopAfterApprovalMs": 7925,
+          "verifiedAfterApprovalMs": 93654,
+          "evidence": "GUI Stop returned to Send; sentinel still before-cancel more than 90 seconds after a write scheduled for 30 seconds; no late completion appeared"
+        },
+        {
+          "name": "partial_stream_transport_error",
+          "passed": true,
+          "disconnectedAt": "2026-10-07T04:52:52.700Z",
+          "pid": 95545,
+          "evidence": "GUI displayed STREAM_BEGIN_2 and at least 37 STREAM_PROBE lines while Stop remained available; terminated only the disposable-project OpenCode serve child; GUI displayed OpenCode event stream ended unexpectedly. and returned to disabled Send after 21 seconds."
+        },
+        {
+          "name": "same_conversation_reconnect",
+          "passed": true,
+          "previousPid": 95545,
+          "reconnectedPid": 99616,
+          "evidence": "Sent recovery prompt in the same GUI command cancellation test conversation; a new isolated engine child started in the same temporary project; GUI displayed GUI_RECONNECT_OK and returned to disabled Send; prior turns remained in history."
+        }
+      ],
+      "external_cli_unchanged": true,
+      "final_files": {
+        "approval-allow.txt": "after-allow\n",
+        "approval-deny.txt": "before-deny\n",
+        "cancel.txt": "before-cancel\n"
+      },
+      "provider": "OpenCode → luxecode/PER → 9router",
+      "approval_mode": "Supervised",
+      "core_changes_required": false
+    }
+  },
+  "files_changed": [
+    {
+      "path": "src-tauri/src/gateway.rs",
+      "purpose": "Reject key-only gateway activation; override OpenCode home and disable project config; remove inherited DB/TUI overrides"
+    },
+    {
+      "path": "src-tauri/examples/gateway-check.rs",
+      "purpose": "Run the production native gateway::apply for acceptance"
+    },
+    {
+      "path": "scripts/check-opencode-gateway-poc.mjs",
+      "purpose": "Native fixture/live acceptance, error injections and external CLI file snapshots"
+    },
+    {
+      "path": "scripts/launch-gateway.zsh",
+      "purpose": "Hidden-key gateway preflight and app launch without global shell configuration"
+    },
+    {
+      "path": "docs/luxecode-p0-p1.md",
+      "purpose": "Record tested scope and safe startup instructions"
+    }
+  ],
+  "tests_added": [
+    "Native preflight: empty key, invalid key, missing profile",
+    "Native fixture: inherited project/home/config/auth/DB isolation",
+    "Native fixture: runtime 401/429/503/timeout/partial stream",
+    "Live native temporary-project acceptance with PER"
+  ],
+  "commands": [
+    {
+      "command": "cargo clippy -p luxecode --lib --example gateway-check -- -D warnings",
+      "result": "passed",
+      "reason": "Native library and acceptance example pass clippy with warnings denied"
+    },
+    {
+      "command": "cargo test -p luxecode --lib gateway::tests -- --test-threads=1",
+      "result": "passed",
+      "reason": "5 tests passed"
+    },
+    {
+      "command": "cargo build -p luxecode --example gateway-check",
+      "result": "passed",
+      "reason": "Native runner built and used by fixture/live acceptance"
+    },
+    {
+      "command": "node scripts/check-opencode-gateway-poc.mjs PRIVATE_ENGINE",
+      "result": "passed",
+      "reason": "24 fixture inference requests; no real provider calls; final run validates hostile inherited config/auth variables"
+    },
+    {
+      "command": "node scripts/check-opencode-gateway-poc.mjs PRIVATE_ENGINE --live",
+      "result": "passed",
+      "reason": "Real gateway/provider task; key in child environment, not command arguments or files"
+    },
+    {
+      "command": "npm test -- src/integrations/harness/providers/opencode",
+      "result": "passed",
+      "reason": "64 tests passed across 4 files; these are regressions, not extra live-provider calls"
+    },
+    {
+      "command": "cargo fmt --check; prettier --check; zsh -n scripts/launch-gateway.zsh; git diff --check",
+      "result": "passed",
+      "reason": "Formatting, shell syntax and diff whitespace checks passed"
+    },
+    {
+      "command": "npx --no-install tauri build --ci --no-sign --bundles app,dmg --config {bundle:{createUpdaterArtifacts:false}}",
+      "result": "passed",
+      "reason": "Unsigned app and Apple Silicon DMG rebuilt with the native gateway changes"
+    }
+  ],
+  "findings": [
+    {
+      "id": "API-AUTH-001",
+      "severity": "Info",
+      "endpoint": "/v1/models",
+      "category": "authn",
+      "evidence": "Catalog remains public with HTTP 200",
+      "expected": "Inference requires a valid API key",
+      "actual": "Inference without/invalid key returns 401; public catalog is not treated as auth proof",
+      "recommendation": "Keep inference authentication enabled; do not mutate shared gateway settings for this POC"
+    },
+    {
+      "id": "P1-GATE-001",
+      "severity": "Info",
+      "category": "acceptance-scope",
+      "evidence": "Real desktop Supervised allow/deny, Stop during a running command, partial-stream transport error and same-conversation reconnect passed on a disposable project; external CLI hashes unchanged",
+      "expected": "Desktop behavior must be exercised through actual GUI, independently of native fixtures",
+      "actual": "Requested local GUI gates passed; HTTP-specific GUI errors, combo fidelity, remote parity and signed release remain outside this acceptance",
+      "recommendation": "Complete the remaining explicitly unverified gates before claiming full P1 release acceptance"
+    }
+  ],
+  "blockers": [],
+  "unverified": [
+    "Desktop HTTP-specific 401/429/5xx/timeout error presentation and retry behavior; native fixtures do not prove these GUI cases",
+    "All members/fallback branches of PER combo and full-context/model fidelity",
+    "Remote host parity",
+    "Signed/notarized release"
+  ],
+  "next_steps": [
+    "Use scripts/launch-gateway.zsh for subsequent launches; enter the gateway key in hidden input; do not open via Finder when gateway environment is required",
+    "Complete HTTP-specific GUI error cases, combo fidelity and remote parity before marking all P1 release gates complete"
+  ],
+  "artifacts": {
+    "app": "target/release/bundle/macos/LuxeCode.app",
+    "dmg": "target/release/bundle/dmg/LuxeCode_0.8.0_aarch64.dmg",
+    "developer_id_signed": false,
+    "apple_notarized": false
+  },
+  "secret_handling": {
+    "profile_and_repo_secret_written": false,
+    "global_cli_changed": false,
+    "gateway_settings_changed": false,
+    "api_keys_created_or_changed": false
+  },
+  "warnings": [
+    "Existing CSS ::highlight minifier warnings and large chunks remain; build succeeds"
+  ]
+}

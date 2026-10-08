@@ -25,6 +25,7 @@ export type TitleInput = {
   cwd: string;
   message: string;
   providerAccountId?: string;
+  model?: string;
 };
 
 /** One-shot, isolated text generation shared by titles and side questions. */
@@ -82,6 +83,7 @@ export type HarnessAdapter = {
     providerSessionId: string,
     cwd: string,
     providerAccountId?: string,
+    model?: string,
   ): void;
   /** Seed provider task state from a restored session's persisted panels. */
   restoreTaskLists?(threadId: string, lists: TaskListMeta[]): void;
@@ -375,9 +377,14 @@ export function bindHarnessSession(
   providerAccountId?: string,
   /** Restored transcript, so the adapter can reseed its task state. */
   blocks?: Block[],
+  model?: string,
 ): void {
   const adapter = getHarness(harness);
-  adapter?.bindSession(threadId, providerSessionId, cwd, providerAccountId);
+  if (harness === "opencode" && model) {
+    adapter?.bindSession(threadId, providerSessionId, cwd, providerAccountId, model);
+  } else {
+    adapter?.bindSession(threadId, providerSessionId, cwd, providerAccountId);
+  }
   if (!blocks || !adapter?.restoreTaskLists) return;
   const lists = blocks.flatMap((block) =>
     block.role === "tasks" && block.taskList ? [block.taskList] : [],

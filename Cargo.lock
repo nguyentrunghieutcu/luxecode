@@ -2268,6 +2268,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
+name = "luxecode"
+version = "0.8.0"
+dependencies = [
+ "arboard",
+ "base64 0.22.1",
+ "block2",
+ "libc",
+ "notify-rust",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-user-notifications",
+ "open",
+ "png 0.18.1",
+ "portable-pty",
+ "raw-window-handle",
+ "rusqlite",
+ "security-framework",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tauri-plugin-window-state",
+ "tauri-winrt-notification 0.8.1",
+ "time",
+ "toml 0.9.12+spec-1.1.0",
+ "unicode-normalization",
+ "ureq",
+ "url",
+ "uuid",
+ "windows 0.62.2",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "mac-notification-sys"
 version = "0.6.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2337,46 +2378,6 @@ checksum = "30d65c71f1ce40ab09135ce117d742b9f8a19ff91a41a8b57ed50bc2de59c427"
 dependencies = [
  "libc",
  "wasi",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "monocode"
-version = "0.8.0"
-dependencies = [
- "arboard",
- "base64 0.22.1",
- "block2",
- "libc",
- "notify-rust",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "objc2-user-notifications",
- "open",
- "png 0.18.1",
- "portable-pty",
- "raw-window-handle",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tauri-plugin-window-state",
- "tauri-winrt-notification 0.8.1",
- "time",
- "toml 0.9.12+spec-1.1.0",
- "unicode-normalization",
- "ureq",
- "url",
- "uuid",
- "windows 0.62.2",
  "windows-sys 0.61.2",
 ]
 

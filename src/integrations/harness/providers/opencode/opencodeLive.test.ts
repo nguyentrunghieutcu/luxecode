@@ -88,12 +88,12 @@ const waitFor = async (predicate: () => boolean, label: string) => {
 
 function turn(
   events: HarnessEvent[],
-  options: { runtimeMode?: RuntimeMode; onAccepted?: () => void } = {},
+  options: { runtimeMode?: RuntimeMode; onAccepted?: () => void; model?: string } = {},
 ) {
   return sendOpenCodeTurn({
     sessionId: "opencode-live",
     cwd: "/repo",
-    model: "opencode:openrouter/anthropic/claude-sonnet-4.6",
+    model: options.model ?? "opencode:openrouter/anthropic/claude-sonnet-4.6",
     runtimeMode: options.runtimeMode ?? "supervised",
     text: "delegate the investigation",
     attachments: [],
@@ -170,6 +170,33 @@ it("reports when OpenCode accepts a turn", async () => {
   await done;
   expect(onAccepted).toHaveBeenCalledOnce();
 });
+
+it("pins gateway processes to the selected profile and refuses a direct/profile switch in the same session", async () => {
+  const profileId = "11111111-1111-4111-8111-111111111111";
+  const events: HarnessEvent[] = [];
+  const done = turn(events, { model: `opencode:luxecode-${profileId}/coding` });
+  await waitFor(() => harnessHttp.mock.calls.some(([input]) => input.url.includes("/prompt_async")), "gateway prompt");
+  expect(spawnChild).toHaveBeenCalledWith("opencode-live", "/fake/opencode", expect.any(Array), "/repo", undefined, "opencode", profileId);
+  idle();
+  await done;
+  await expect(turn(events)).rejects.toThrow("new conversation");
+  await expect(turn(events, { model: "opencode:luxecode-22222222-2222-4222-8222-222222222222/other" })).rejects.toThrow("new conversation");
+  expect(spawnChild).toHaveBeenCalledTimes(1);
+  await stopOpenCodeSession("opencode-live");
+  await expect(turn(events)).rejects.toThrow("saved gateway connection");
+});
+
+it.each(["opencode:luxecode/PER", "opencode:luxecode-invalid/combo"])(
+  "restores blocked gateway route %s without breaking startup or allowing direct execution",
+  async (model) => {
+    expect(() =>
+      bindOpenCodeSession("opencode-live", "session_1", "/repo", undefined, model),
+    ).not.toThrow();
+    await expect(turn([], { model })).rejects.toThrow("No direct fallback");
+    await expect(turn([])).rejects.toThrow("No direct fallback");
+    expect(spawnChild).not.toHaveBeenCalled();
+  },
+);
 
 describe("OpenCode subagent trails", () => {
   const part = (sessionID: string, value: Record<string, unknown>) => onSseEvent?.({

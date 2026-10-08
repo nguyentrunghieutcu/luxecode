@@ -1,4 +1,5 @@
 import { TurnNotReadyError } from "../../core/types";
+import { gatewayProfileId } from "../../../../features/providers/model/gatewayProfiles";
 import {
   modelContextWindow,
   nativeModelId,
@@ -86,6 +87,7 @@ type PendingQuestion = {
 };
 
 type Live = {
+  gatewayProfileId?: string;
   client: OpenCodeClient;
   openCodeSessionId: string;
   cwd: string;
@@ -118,6 +120,9 @@ type Live = {
 type Resume = {
   sessionId: string;
   cwd: string;
+  gatewayProfileId?: string;
+  connectionBound?: boolean;
+  connectionError?: string;
 };
 
 const SERVER_TIMEOUT_MS = 30_000;
@@ -354,15 +359,32 @@ export function bindOpenCodeSession(
   threadId: string,
   providerSessionId: string,
   cwd: string,
+  _providerAccountId?: string,
+  model?: string,
 ): void {
   const sessionId = providerSessionId.trim();
   if (!threadId || !sessionId || !cwd.trim()) return;
-  resumeByThread.set(threadId, { sessionId, cwd });
+  const resume: Resume = { sessionId, cwd, connectionBound: !!model };
+  try {
+    resume.gatewayProfileId = model
+      ? gatewayProfileId(nativeModelId(model))
+      : undefined;
+  } catch (error) {
+    resume.connectionError =
+      error instanceof Error ? error.message : String(error);
+  }
+  resumeByThread.set(threadId, resume);
 }
 
 async function ensureLive(input: HarnessSessionInput): Promise<Live> {
+  const restored = resumeByThread.get(input.sessionId);
+  if (restored?.connectionError) throw new Error(restored.connectionError);
+  const profileId = gatewayProfileId(nativeModelId(input.model));
   const existing = liveByThread.get(input.sessionId);
   if (existing && existing.cwd === input.cwd) {
+    if (existing.gatewayProfileId !== profileId) {
+      throw new Error("Start a new conversation to switch between direct mode and gateway connections. The existing session remains unchanged.");
+    }
     existing.onEvent = input.onEvent;
     if (existing.runtimeMode !== input.runtimeMode) {
       await existing.client.updateSession(existing.openCodeSessionId, {
@@ -378,6 +400,9 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   }
 
   const resume = resumeByThread.get(input.sessionId);
+  if (resume?.connectionBound && resume.gatewayProfileId !== profileId) {
+    throw new Error("Start a new conversation to change the saved gateway connection; the existing session cannot resume through another gateway or direct mode.");
+  }
   const canResume = resume != null && resume.cwd === input.cwd;
   if (resume && resume.cwd !== input.cwd) {
     resumeByThread.delete(input.sessionId);
@@ -424,6 +449,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     input.cwd,
     undefined,
     "opencode",
+    profileId,
   );
 
   try {
@@ -446,6 +472,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     }
 
     const live: Live = {
+      gatewayProfileId: profileId,
       client,
       openCodeSessionId: openCodeSession.id,
       cwd: input.cwd,
@@ -477,6 +504,8 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     resumeByThread.set(input.sessionId, {
       sessionId: openCodeSession.id,
       cwd: input.cwd,
+      gatewayProfileId: profileId,
+      connectionBound: true,
     });
 
     await client.subscribeEvents(
@@ -1372,7 +1401,7 @@ async function assertOpenCodeVersion(path: string, cwd: string): Promise<void> {
   const version = parseOpenCodeVersion(output);
   if (!version) {
     throw new Error(
-      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
+      `Unable to determine OpenCode version. LuxeCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
     );
   }
   if (compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {

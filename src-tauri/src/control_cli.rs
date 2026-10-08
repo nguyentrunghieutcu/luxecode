@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-const USAGE: &str = r#"MonoCode local control — supervise this orchestration run from the lead agent.
+const USAGE: &str = r#"LuxeCode local control — supervise this orchestration run from the lead agent.
 
 Usage: {exe} control ACTION [--json JSON | --input FILE|-] [--request-id ID]
 
@@ -56,7 +56,7 @@ for corrections -> review each task -> finish.
 
 When paused, list, get and wait still return the reason and recovery steps.
 Do not keep polling or retry mutations. Explain the pause and ask the user to
-click Resume in MonoCode. Resume continues interrupted workers in their
+click Resume in LuxeCode. Resume continues interrupted workers in their
 retained checkouts. A policy-blocked worker remains stopped until message,
 retry or cancel explicitly resolves it.
 
@@ -71,10 +71,10 @@ failed response reports the ID it used whenever the outcome is unknown — a
 timeout, say. Retry that exact call with --request-id ID; retrying a delegate
 under a fresh ID instead would queue a second worker.
 
-Tasks run inside the MonoCode app, not in this process. Exiting this CLI, or a
+Tasks run inside the LuxeCode app, not in this process. Exiting this CLI, or a
 failure here, never cancels a task that was already accepted.
 
-MonoCode sets MONOCODE_CONTROL_ENDPOINT and MONOCODE_CONTROL_TOKEN for the lead
+LuxeCode sets MONOCODE_CONTROL_ENDPOINT and MONOCODE_CONTROL_TOKEN for the lead
 agent's process only. They are already in your environment; never print them.
 "#;
 
@@ -110,7 +110,7 @@ const APP_ACTIONS: [&str; 26] = [
     "habits.remove",
     "chat.card",
 ];
-const APP_USAGE: &str = r#"MonoCode app access — use in a thread enabled by /operator.
+const APP_USAGE: &str = r#"LuxeCode app access — use in a thread enabled by /operator.
 
 Usage: {exe} app ACTION [--json JSON | --input FILE|-] [--request-id ID]
 
@@ -133,7 +133,7 @@ Actions:
                   in the calling Mono's chat. It waits until that Mono is idle.
   sessions.draft {"sessionId":"...","prompt":"..."}
                   Save an unsent draft in an idle project session. Existing
-                  drafts are preserved; send or remove one in MonoCode first.
+                  drafts are preserved; send or remove one in LuxeCode first.
                   Reuse --request-id on retries.
   sessions.start {"prompt":"...","harness":"codex","model":"codex:...",
                   "effort":"high","reveal":false,
@@ -223,7 +223,7 @@ Actions:
                   the user must start it before it is scheduled.
 
 The output is one JSON line: {"ok":true,"result":...} or {"ok":false,"error":"..."}.
-Use --input - to pass JSON on stdin. Never print MonoCode credentials.
+Use --input - to pass JSON on stdin. Never print LuxeCode credentials.
 Keep the same --request-id when retrying a call after an uncertain result.
 "#;
 
@@ -363,23 +363,23 @@ fn send(action: &str, input: &Value, request_id: &str, app_mode: bool) -> Result
     };
     let endpoint = std::env::var(endpoint_key).map_err(|_| {
         unsent(if app_mode {
-            "No MonoCode app connection. Start this agent turn in MonoCode."
+            "No LuxeCode app connection. Start this agent turn in LuxeCode."
         } else {
-            "No MonoCode connection. Confirm the Orchestrator proposal in MonoCode first."
+            "No LuxeCode connection. Confirm the Orchestrator proposal in LuxeCode first."
         })
     })?;
     let token = std::env::var(token_key)
-        .map_err(|_| unsent("No MonoCode session credential. Start the agent from MonoCode."))?;
+        .map_err(|_| unsent("No LuxeCode session credential. Start the agent from LuxeCode."))?;
     let address: SocketAddr = endpoint
         .parse()
-        .map_err(|_| unsent("Invalid MonoCode endpoint"))?;
+        .map_err(|_| unsent("Invalid LuxeCode endpoint"))?;
     if !address.ip().is_loopback() {
-        return Err(unsent("MonoCode control only connects to localhost"));
+        return Err(unsent("LuxeCode control only connects to localhost"));
     }
     let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(3))
         .map_err(|error| {
             unsent(format!(
-                "Cannot connect to MonoCode at {address}: {error}. The app may have restarted, or this agent's sandbox may be blocking localhost."
+                "Cannot connect to LuxeCode at {address}: {error}. The app may have restarted, or this agent's sandbox may be blocking localhost."
             ))
         })?;
     stream
@@ -399,11 +399,11 @@ fn send(action: &str, input: &Value, request_id: &str, app_mode: bool) -> Result
     BufReader::new(stream)
         .take(max_response + 1)
         .read_line(&mut line)
-        .map_err(|e| sent(format!("No reply from MonoCode: {e}")))?;
+        .map_err(|e| sent(format!("No reply from LuxeCode: {e}")))?;
     if line.len() > max_response as usize {
-        return Err(sent("MonoCode response is too large"));
+        return Err(sent("LuxeCode response is too large"));
     }
-    serde_json::from_str(&line).map_err(|_| sent("MonoCode returned an invalid response"))
+    serde_json::from_str(&line).map_err(|_| sent("LuxeCode returned an invalid response"))
 }
 
 fn read_capped(mut source: impl Read) -> Result<String, String> {

@@ -65,8 +65,8 @@ export function sessionConversationPage(
       user: capped(
         user.monoSessionCompletion
           ? user.monoSessionCompletion.sessionCount
-            ? `MonoCode: results from ${user.monoSessionCompletion.sessionCount} sessions`
-            : `MonoCode: session ${user.monoSessionCompletion.status}: ${user.monoSessionCompletion.title}`
+            ? `LuxeCode: results from ${user.monoSessionCompletion.sessionCount} sessions`
+            : `LuxeCode: session ${user.monoSessionCompletion.status}: ${user.monoSessionCompletion.title}`
           : operatorUserPrompt(user),
         maxChars,
       ),

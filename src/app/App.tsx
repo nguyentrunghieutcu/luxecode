@@ -955,7 +955,7 @@ const NO_TITLE_TABS: [] = [];
 
 /** Native sheet. `window.confirm` is swallowed when a macOS menu accelerator fires. */
 function confirmDiscardUnsaved(message: string): Promise<boolean> {
-  return ask(message, { title: "MonoCode", kind: "warning" });
+  return ask(message, { title: "LuxeCode", kind: "warning" });
 }
 
 function titleTabsEqual(a: TitleTab[], b: TitleTab[]): boolean {
@@ -2468,7 +2468,7 @@ function Workspace({
     if (!document) {
       void message(
         "Release notes for this version are not available in this build.",
-        { title: "MonoCode" },
+        { title: "LuxeCode" },
       );
       return;
     }
@@ -4171,6 +4171,7 @@ function Workspace({
           sessionWorkCwd(restored),
           restored.providerAccountId,
           restored.blocks,
+          restored.model,
         );
       }
       lastPersisted.current.set(restored.id, persistFingerprint(restored));
@@ -4911,6 +4912,7 @@ function Workspace({
               sessionWorkCwd(session),
               pending.fromProviderAccountId,
               session.blocks,
+              pending.from === session.harness ? session.model : undefined,
             );
           }
         }
@@ -5128,7 +5130,7 @@ function Workspace({
           } catch (error) {
             void message(
               `The session was deleted. Its worktree was kept.\n\n${String(error)}\n\nYou can manage it in Settings → Worktrees.`,
-              { title: "MonoCode", kind: "warning" },
+              { title: "LuxeCode", kind: "warning" },
             );
           }
         }
@@ -5136,7 +5138,7 @@ function Workspace({
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         void message(`Could not ${mode} this conversation.\n\n${detail}`, {
-          title: "MonoCode",
+          title: "LuxeCode",
           kind: "error",
         });
         return false;
@@ -5172,7 +5174,7 @@ function Workspace({
         void message(
           `Could not unarchive this conversation.\n\n${String(error)}`,
           {
-            title: "MonoCode",
+            title: "LuxeCode",
             kind: "error",
           },
         );
@@ -5302,7 +5304,7 @@ function Workspace({
           void refreshHistory(sidebarCwd);
           void message(
             `Could not update this conversation's GitHub link.\n\n${String(error)}`,
-            { title: "MonoCode", kind: "error" },
+            { title: "LuxeCode", kind: "error" },
           );
         },
       );
@@ -5353,7 +5355,7 @@ function Workspace({
       const { name } = monoLook(mono);
       const confirmed = await ask(
         `Delete ${name}? Its conversation will be deleted and its habits stop. This can’t be undone.`,
-        { title: "MonoCode", kind: "warning" },
+        { title: "LuxeCode", kind: "warning" },
       );
       if (!confirmed) return;
       if (mono.sessionId) {
@@ -6638,7 +6640,7 @@ function Workspace({
         !current.blocks.some((block) => block.role === "user" && !block.draft);
       const promptText = operatorCommand.matched
         ? operatorCommand.text.trim() ||
-          "Explain what you can do in MonoCode with the app CLI."
+          "Explain what you can do in LuxeCode with the app CLI."
         : submittedText;
       const rawCommand =
         !operatorCommand.matched &&
@@ -7183,6 +7185,7 @@ function Workspace({
           cwd: workCwd,
           message: titleMessage,
           providerAccountId,
+          model: current.model,
         })
           .then(async (generated) => {
             if (
@@ -9989,6 +9992,7 @@ function Workspace({
             sessionWorkCwd(worker),
             worker.providerAccountId,
             worker.blocks,
+            worker.model,
           );
         await upsertSession(worker);
         const next = [...sessionsRef.current, worker];
@@ -10252,7 +10256,7 @@ function Workspace({
           source.orchestrationLeadId ||
           orchestrator.run(source.id)
         )
-          throw new Error("This session cannot use the MonoCode app CLI");
+          throw new Error("This session cannot use the LuxeCode app CLI");
         const key = `${source.id}:${payload.requestId}`;
         const signature = JSON.stringify([payload.action, payload.input]);
         const previous = appReceipts.current.get(key);

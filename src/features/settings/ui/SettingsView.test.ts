@@ -114,6 +114,27 @@ afterEach(async () => {
 });
 
 describe("settings pages", () => {
+  it("uses the shared settings group and responsive rows for the 9router gateway", async () => {
+    await render("providers");
+    const accounts = container.querySelector('[data-setting-id="provider-accounts"]')!;
+    const gateway = container.querySelector('[data-setting-id="9router-gateway"]')!;
+    expect(gateway.id).toBe("setting-9router-gateway");
+    expect(gateway.className).toBe(accounts.className);
+    expect(gateway.querySelector("h2")?.className).toBe(accounts.querySelector("h2")?.className);
+    expect(gateway.querySelector(":scope > div:last-child")?.className).toBe(accounts.querySelector(":scope > div:last-child")?.className);
+    for (const input of gateway.querySelectorAll("input")) {
+      expect(input.closest(".settings-row")).not.toBeNull();
+      expect(input.closest(".settings-row-control")).not.toBeNull();
+      expect(input.classList.contains("h-8")).toBe(true);
+    }
+  });
+
+  it("reveals and highlights the gateway card using the shared settings anchor", async () => {
+    await render("providers", { anchor: "9router-gateway" });
+    const gateway = container.querySelector("#setting-9router-gateway")!;
+    expect(gateway.querySelector(":scope > div:last-child")?.className).toContain("border-accent/60");
+  });
+
   it("keeps account emails blurred until clicked and hides them when settings reopen", async () => {
     saveMaskEmails(true);
     vi.mocked(invoke).mockImplementation(async (command, args) => {

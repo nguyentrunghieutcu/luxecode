@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { HarnessId } from "../../sessions/model/session";
+import { resolveCodexBinary } from "../../../integrations/harness/core/child";
+import { runtimeProviderBinaryPath } from "./providerBinaryPaths";
 import {
   compareSemver,
   parseOpenCodeVersion,
@@ -56,7 +58,17 @@ export function claimLaunchHarnessUpdateCheck(): Promise<boolean> {
   return invoke<boolean>("harness_update_check_claim");
 }
 
-export function fetchLatestHarnessVersion(harness: HarnessId): Promise<string> {
+export async function fetchLatestHarnessVersion(
+  harness: HarnessId,
+): Promise<string> {
+  if (harness === "codex") {
+    const resolved = await resolveCodexBinary();
+    return invoke<string>("harness_latest_version", {
+      provider: harness,
+      command: resolved.path,
+      binaryPath: runtimeProviderBinaryPath(harness),
+    });
+  }
   return invoke<string>("harness_latest_version", { provider: harness });
 }
 

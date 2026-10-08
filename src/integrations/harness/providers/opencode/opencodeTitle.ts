@@ -11,10 +11,12 @@ export async function generateOpenCodeSessionTitle(input: {
   sessionId: string;
   cwd: string;
   message: string;
+  model?: string;
 }): Promise<GeneratedSessionTitle | null> {
   try {
     const output = await runOpenCodeTextPrompt({
       cwd: input.cwd,
+      model: input.model,
       prompt: buildThreadTitlePrompt(input.message),
       timeoutMs: TITLE_TIMEOUT_MS,
     });

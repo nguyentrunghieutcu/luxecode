@@ -54,6 +54,13 @@ afterEach(() => {
 });
 
 describe("isCurrentChildExit", () => {
+  it("passes only an explicit gateway profile to local OpenCode spawns", async () => {
+    const child = await loadChild();
+    mocks.invoke.mockResolvedValue(42);
+    await child.spawnChild("session", "/fake/opencode", ["serve"], "/repo", undefined, "opencode", "profile-id");
+    expect(mocks.invoke).toHaveBeenCalledWith("harness_spawn", expect.objectContaining({ gatewayProfileId: "profile-id", binaryProvider: "opencode" }));
+    await expect(child.spawnChild("session", "/fake/codex", [], "/repo", undefined, "codex", "profile-id")).rejects.toThrow("no direct fallback");
+  });
   it("matches only the live child's pid", async () => {
     installResolvedListeners();
     const { isCurrentChildExit } = await loadChild();

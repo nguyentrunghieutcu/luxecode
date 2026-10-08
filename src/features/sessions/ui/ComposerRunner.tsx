@@ -77,6 +77,7 @@ export function ComposerRunner({
   const busyRef = useRef(busy);
   const enabledRef = useRef(enabled);
   const onExitedRef = useRef(onExited);
+  const syncRef = useRef<(() => void) | null>(null);
   busyRef.current = busy;
   enabledRef.current = enabled;
   onExitedRef.current = onExited;
@@ -107,6 +108,9 @@ export function ComposerRunner({
     let prevWidth = 0;
     let last = performance.now();
     let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+    let pausedAt: number | null = null;
     let coinId = 0;
     let nextCoinAt = last + nextCoinDelay(true);
     let exiting = false;
@@ -218,17 +222,17 @@ export function ComposerRunner({
       last = now;
 
       const box = boxRef.current;
-      if (!enabledRef.current) {
+      if (!enabledRef.current || document.hidden) {
         showLayer(false);
-        endStun();
         if (!busyRef.current && !finished) {
           finished = true;
+          endStun();
           clearCoins();
           onExitedRef.current();
         }
         return;
       }
-      if (!box || document.hidden) {
+      if (!box) {
         showLayer(false);
         return;
       }
@@ -444,18 +448,66 @@ export function ComposerRunner({
       );
     };
 
-    apply(last);
-    const tick = (now: number) => {
-      apply(now);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
+    const cancel = () => {
       cancelAnimationFrame(raf);
+      raf = 0;
+      if (timer != null) clearTimeout(timer);
+      timer = null;
+    };
+    const schedule = () => {
+      if (disposed || finished || !enabledRef.current || document.hidden) return;
+      if (reduced) {
+        timer = setTimeout(() => tick(performance.now()), GEOMETRY_SAMPLE_MS);
+      } else {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    const tick = (now: number) => {
+      raf = 0;
+      timer = null;
+      if (disposed) return;
+      apply(now);
+      schedule();
+    };
+    const sync = () => {
+      cancel();
+      const now = performance.now();
+      if (!enabledRef.current || document.hidden) {
+        pausedAt ??= now;
+      } else {
+        if (pausedAt != null) {
+          const elapsed = now - pausedAt;
+          nextCoinAt += elapsed;
+          stunAt += elapsed;
+          exitAt += elapsed;
+          for (const coin of coins) {
+            if (coin.collectedAt != null) coin.collectedAt += elapsed;
+          }
+          pausedAt = null;
+        }
+        geometryAt = -Infinity;
+      }
+      last = now;
+      apply(now);
+      schedule();
+    };
+    syncRef.current = sync;
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      disposed = true;
+      syncRef.current = null;
+      document.removeEventListener("visibilitychange", sync);
+      cancel();
+      endStun();
+      for (const el of starEls) el.remove();
       clearCoins();
       showLayer(false);
     };
   }, [boxRef]);
+
+  useLayoutEffect(() => {
+    syncRef.current?.();
+  }, [boxRef, busy, enabled]);
 
   return createPortal(
     <div

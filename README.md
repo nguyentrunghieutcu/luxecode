@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/monocode.png" alt="MonoCode" width="88" />
+  <img src="public/luxecode-logo.png" alt="LuxeCode" width="200" />
 </p>
 
-<h1 align="center">MonoCode</h1>
+<h1 align="center">LuxeCode</h1>
 
 <p align="center">
   <strong>A desktop UI for your coding agents.</strong>
@@ -12,7 +12,11 @@
   <img width="1680" height="1050" alt="Screenshot 2026-09-04 at 06 34 00" src="https://github.com/user-attachments/assets/2cd4a6ec-eb1e-4b45-8627-a76442ea3874" />
 </p>
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Antigravity, Pi, omp, fx, and Hermes Agent. If they’re installed and logged in, MonoCode can run them. Tabs are sessions. The composer is the input. MonoCode does not sell tokens.
+Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Antigravity, Pi, omp, fx, and Hermes Agent. If they’re installed and logged in, LuxeCode can run them. Tabs are sessions. The composer is the input. LuxeCode does not sell tokens.
+
+## LuxeCode fork
+
+Based on MonoCode `v0.8.0` (`9ccfc094615aa3170c01ae77a44298aefacdc9de`), retaining its MIT license and harness architecture. LuxeCode has its own application/data identity and release channel. See `docs/luxecode-p0-p1.md` for the opt-in data import and isolated OpenCode → 9router POC. Gateway settings are available for local macOS OpenCode sessions; see `docs/luxecode-p2.md`. The LuxeCode card in 9router is not implemented yet.
 
 ## Install
 
@@ -29,23 +33,25 @@ Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCod
 > - [fx](https://fx.sh) - `curl -fsSL https://fx.sh/setup.sh | bash` then `fx login`
 > - [Hermes Agent](https://github.com/NousResearch/hermes-agent) - macOS/Linux: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`; Windows PowerShell: `iex (irm https://hermes-agent.nousresearch.com/install.ps1)`; then run `hermes model`
 
-macOS (Apple Silicon): download [MonoCode.dmg](https://dl.usemono.dev/MonoCode.dmg), open it, drag MonoCode to Applications.
+macOS (Apple Silicon): download [LuxeCode.dmg](https://github.com/nguyentrunghieutcu/luxecode/releases/latest), open it, drag LuxeCode to Applications.
 
-macOS (Intel): download [MonoCode_x64.dmg](https://dl.usemono.dev/MonoCode_x64.dmg), open it, drag MonoCode to Applications.
+macOS (Intel): download [LuxeCode_x64.dmg](https://github.com/nguyentrunghieutcu/luxecode/releases/latest), open it, drag LuxeCode to Applications.
 
-Linux (x86_64): download the `.deb` or AppImage from [GitHub Releases](https://github.com/hardbeat920/monocode/releases/latest). Install the `.deb` with `sudo apt install ./MonoCode_*.deb`, or make the AppImage executable with `chmod +x MonoCode_*.AppImage` and run it directly. On Fedora and Enterprise Linux 10, download the `.rpm` from the same release page — see [Fedora / Enterprise Linux packages](#fedora--enterprise-linux-packages) for the one extra repository step Enterprise Linux needs.
+Linux (x86_64): download the `.deb` or AppImage from [GitHub Releases](https://github.com/nguyentrunghieutcu/luxecode/releases/latest). Install the `.deb` with `sudo apt install ./LuxeCode_*.deb`, or make the AppImage executable with `chmod +x LuxeCode_*.AppImage` and run it directly. On Fedora and Enterprise Linux 10, download the `.rpm` from the same release page — see [Fedora / Enterprise Linux packages](#fedora--enterprise-linux-packages) for the one extra repository step Enterprise Linux needs.
 
-Windows (x86_64): download the NSIS installer from [GitHub Releases](https://github.com/hardbeat920/monocode/releases/latest) and run it.
+Windows (x86_64): download the NSIS installer from [GitHub Releases](https://github.com/nguyentrunghieutcu/luxecode/releases/latest) and run it.
 
 ## Some notes
 
 Experimental remote sessions: run agents on an always-on Windows, Linux, or macOS machine and connect from the desktop. See [remote access setup and current limitations](docs/remote-access.md).
 
+Local macOS 9router gateway: configure **Settings → Providers → 9router gateway**, store a dedicated key in macOS Keychain, and select a model/combo through OpenCode 1.18.35+. See [gateway setup, key rotation and isolation](docs/luxecode-p2.md). Other harnesses stay direct; gateway errors never silently fall back.
+
 This is very early and you should expect bugs.
 
-### Agent access to MonoCode
+### Agent access to LuxeCode
 
-Type `/operator` at the start of a composer message to enable MonoCode access in that thread. For example, `/operator start two Codex sessions: one to inspect the API and one to review the UI`, or `/operator list my notes`. The slash picker also offers this command. The transcript shows only the request text in a translucent amber bubble; MonoCode removes the command from the request sent to the agent and supplies the local `app` CLI path and instructions on that turn. Later turns in the same thread can use the CLI without repeating `/operator`; other threads receive no CLI instructions or app access. The CLI can act only during an active agent turn. The agent can run the shown `app --help` command for the exact JSON input fields.
+Type `/operator` at the start of a composer message to enable LuxeCode access in that thread. For example, `/operator start two Codex sessions: one to inspect the API and one to review the UI`, or `/operator list my notes`. The slash picker also offers this command. The transcript shows only the request text in a translucent amber bubble; LuxeCode removes the command from the request sent to the agent and supplies the local `app` CLI path and instructions on that turn. Later turns in the same thread can use the CLI without repeating `/operator`; other threads receive no CLI instructions or app access. The CLI can act only during an active agent turn. The agent can run the shown `app --help` command for the exact JSON input fields.
 
 - `models.list` shows available providers, models, settings, and permission modes.
 - `sessions.start` opens a tab in the current project with a prompt. Set `placement: "right"` or `placement: "down"` to split the calling session's pane instead; `besideSessionId` selects another visible session pane in the project. Reuse the returned session ID as the next `besideSessionId` to build nested layouts. By default it submits the prompt; set `draft: true` to save it unsent without starting an agent turn. It accepts a provider, model, effort or other model settings, permission mode, and current checkout or new worktree choice. Set `worktreeCwd` to a path from `worktrees.list` for a specific existing checkout. Use `worktrees.create` to create a worktree on a named new or existing local branch, then pass its path as `worktreeCwd`. Omit `runtimeMode` to inherit the calling session's permission mode, or set it explicitly to override. It returns the new session ID as soon as the pane and prompt are accepted, so the agent can move it into a folder immediately.
@@ -82,7 +88,7 @@ Tauri loads `src-tauri/tauri.linux.conf.json` automatically for Linux developmen
 
 ### Fedora / Enterprise Linux packages
 
-On Fedora, or on an Enterprise Linux 10 system (registered RHEL, Rocky, Alma, CentOS Stream, Oracle), install the release `.rpm` from [GitHub Releases](https://github.com/hardbeat920/monocode/releases/latest). Enterprise Linux needs EPEL first, because `webkit2gtk4.1` is an EPEL package there — CRB is not needed to run MonoCode. On Oracle Linux 10, `epel-release` does not enable `ol10_developer_EPEL`, which is the repository that provides that package. Enable it before installing the rpm:
+On Fedora, or on an Enterprise Linux 10 system (registered RHEL, Rocky, Alma, CentOS Stream, Oracle), install the release `.rpm` from [GitHub Releases](https://github.com/nguyentrunghieutcu/luxecode/releases/latest). Enterprise Linux needs EPEL first, because `webkit2gtk4.1` is an EPEL package there — CRB is not needed to run LuxeCode. On Oracle Linux 10, `epel-release` does not enable `ol10_developer_EPEL`, which is the repository that provides that package. Enable it before installing the rpm:
 
 ```bash
 # Enterprise Linux 10 only; skip on Fedora.
@@ -90,7 +96,7 @@ sudo dnf install -y epel-release   # RHEL: sudo dnf install -y https://dl.fedora
 # Oracle Linux 10, instead of epel-release:
 # sudo dnf install -y oracle-epel-release-el10 dnf-plugins-core
 # sudo dnf config-manager --set-enabled ol10_developer_EPEL
-sudo dnf install ./MonoCode-*.rpm
+sudo dnf install ./LuxeCode-*.rpm
 ```
 
 The `.rpm` declares its own runtime dependencies, so `dnf` pulls the WebKitGTK stack for you. GitHub Releases builds that package on Enterprise Linux 10 so it loads on Fedora and EL 10. Building natively links the system WebKitGTK instead of the Ubuntu-built libraries shipped in the AppImage, which avoids graphics issues (e.g. `Could not create default EGL display`) on newer Mesa/Wayland systems.
@@ -103,7 +109,7 @@ npm ci
 npm run build:fedora
 ```
 
-That emits a `.rpm` under `target/release/bundle/rpm/`, installable with `sudo dnf install ./target/release/bundle/rpm/MonoCode-*.rpm`. EL 9 and older are unsupported (`webkit2gtk4.1-devel` only exists in EPEL 10).
+That emits a `.rpm` under `target/release/bundle/rpm/`, installable with `sudo dnf install ./target/release/bundle/rpm/LuxeCode-*.rpm`. EL 9 and older are unsupported (`webkit2gtk4.1-devel` only exists in EPEL 10).
 
 ### Troubleshooting on Fedora / Wayland
 
@@ -121,9 +127,9 @@ Tauri loads `src-tauri/tauri.windows.conf.json` automatically for Windows develo
 
 ## Contributors
 
-Thanks to everyone who contributes to MonoCode!
+Thanks to everyone who contributes to LuxeCode!
 
-[![MonoCode contributors](https://contrib.rocks/image?repo=hardbeat920/monocode)](https://github.com/hardbeat920/monocode/graphs/contributors)
+[![LuxeCode contributors](https://contrib.rocks/image?repo=hardbeat920/monocode)](https://github.com/hardbeat920/monocode/graphs/contributors)
 
 ## License
 
@@ -131,6 +137,6 @@ Thanks to everyone who contributes to MonoCode!
 
 ## Acknowledgments
 
-Special thanks to the project that helps us recognize MonoCode's contributors:
+Special thanks to the project that helps us recognize LuxeCode's contributors:
 
 - [contrib.rocks](https://contrib.rocks)

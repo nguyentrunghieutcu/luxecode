@@ -4,6 +4,7 @@ import {
   groupMonoTurns,
   groupTurnItems,
   groupTurns,
+  turnCopyText,
   type TurnItem,
 } from "./transcriptActivity";
 
@@ -14,6 +15,16 @@ export class TranscriptTurnCache {
   private inlineWork = false;
   private turns: Block[][] = [];
   private items = new WeakMap<Block[], Map<string, TurnItem[]>>();
+  private copyTexts = new WeakMap<Block[], string>();
+
+  copyText(turn: Block[]): string {
+    let text = this.copyTexts.get(turn);
+    if (text === undefined) {
+      text = turnCopyText(turn);
+      this.copyTexts.set(turn, text);
+    }
+    return text;
+  }
 
   group(blocks: Block[], managed = false, inlineWork = false): Block[][] {
     if (

@@ -358,6 +358,9 @@ export function resolveModel(harness: HarnessId, id?: string): AgentModel {
       (model) => (model.nativeId ?? nativeIdFrom(model.id)) === slug,
     );
     if (byNative) return byNative;
+    if (harness === "opencode" && /^(luxecode-|luxecode\/)/.test(slug)) {
+      return { id: `opencode:${slug}`, harness, name: slug, nativeId: slug };
+    }
     // Keep moving Claude aliases as aliases until the CLI advertises them.
     if (harness === "claude" && /^(opus|sonnet|haiku)$/.test(slug)) {
       return {

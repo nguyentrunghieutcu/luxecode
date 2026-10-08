@@ -125,7 +125,6 @@ import {
   subagentReport,
   toolCallLabel,
   toolCallState,
-  turnCopyText,
   workKind,
   workSummaryLine,
   type ActivityPhase,
@@ -1314,7 +1313,7 @@ function AgentTranscriptComponent({
                       ? startedAt + (durationMs ?? 0)
                       : undefined)
                   }
-                  copyText={turnCopyText(turn)}
+                  copyText={turnCache.copyText(turn)}
                   onSaveNote={onSaveNote}
                   harness={turnHarness}
                   fromHarness={turnHarness}
@@ -1377,7 +1376,12 @@ function TranscriptContent({
 // Keep hidden panes' local state, and catch up with current props on activation.
 export const AgentTranscript = memo(
   AgentTranscriptComponent,
-  (previous, next) => previous.visible === false && next.visible === false,
+  (previous, next) =>
+    (previous.visible === false && next.visible === false) ||
+    (Object.keys(previous).length === Object.keys(next).length &&
+      Object.keys(previous).every((key) =>
+        Object.is(previous[key as keyof Props], next[key as keyof Props]),
+      )),
 );
 
 /** A message this long after the one before gets its own day and time. */
@@ -3949,7 +3953,7 @@ function ActivityToolRow({
 }
 
 function MonoCodeMark({ className = "size-4" }: { className?: string }) {
-  return <img src="/monocode.png" alt="" className={`shrink-0 ${className}`} />;
+  return <img src="/luxecode.png" alt="" className={`shrink-0 ${className}`} />;
 }
 
 /** MonoCode commands read like the other activity rows; failures expose their output. */
@@ -4003,7 +4007,7 @@ function MonoCodeCallRow({
         <button
           type="button"
           aria-expanded={errorOpen}
-          aria-label={`${errorOpen ? "Hide" : "Show"} error details for MonoCode: ${call.label}`}
+          aria-label={`${errorOpen ? "Hide" : "Show"} error details for LuxeCode: ${call.label}`}
           onClick={() => setErrorOpen((value) => !value)}
           className="flex w-full min-w-0 items-center gap-1.5 py-1 text-left"
         >

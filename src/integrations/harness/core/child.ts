@@ -298,7 +298,11 @@ export async function spawnChild(
   cwd: string,
   account?: { provider: "claude" | "codex"; id: string },
   binaryProvider?: ConfigurableBinaryProvider,
+  gatewayProfileId?: string,
 ): Promise<void> {
+  if (gatewayProfileId && (backend || binaryProvider !== "opencode")) {
+    throw new Error("Gateway connections require the local OpenCode engine; no direct fallback.");
+  }
   livePid.delete(sessionId);
   pendingExit.delete(sessionId);
   ownedChildren.add(sessionId);
@@ -313,6 +317,7 @@ export async function spawnChild(
     account,
     binaryProvider,
     binaryPath,
+    ...(gatewayProfileId ? { gatewayProfileId } : {}),
   });
   if (typeof pid !== "number" || pid <= 0) return;
   livePid.set(sessionId, pid);

@@ -831,6 +831,7 @@ pub fn harness_spawn(
     account: Option<HarnessAccount>,
     binary_provider: Option<String>,
     binary_path: Option<String>,
+    gateway_profile_id: Option<String>,
 ) -> Result<u32, String> {
     let workdir = expand_home(&cwd);
     if !workdir.is_dir() {
@@ -848,7 +849,6 @@ pub fn harness_spawn(
     if let Some(prev) = prev {
         terminate(prev.pid);
     }
-
     let mut cmd = Command::new(&command);
     cmd.args(&args)
         .current_dir(&workdir)
@@ -857,6 +857,20 @@ pub fn harness_spawn(
         .stderr(Stdio::piped());
     prepare_child(&mut cmd, &command);
     apply_provider_account(&app, &mut cmd, account.as_ref())?;
+    let gateway_data_dir = if binary_provider.as_deref() == Some("opencode") {
+        Some(
+            app.path()
+                .app_data_dir()
+                .map_err(|error| error.to_string())?,
+        )
+    } else {
+        None
+    };
+    crate::gateway_profiles::apply(
+        &mut cmd,
+        gateway_data_dir.as_deref(),
+        gateway_profile_id.as_deref(),
+    )?;
 
     crate::control::configure_child(&app, &session_id, &mut cmd);
 
@@ -1304,6 +1318,7 @@ pub(crate) fn is_resolved_harness_binary(
 /// One-shot capture of stdout (used for `cursor-agent --list-models`).
 #[tauri::command]
 pub async fn harness_exec(
+    app: AppHandle,
     command: String,
     args: Vec<String>,
     cwd: Option<String>,
@@ -1318,14 +1333,28 @@ pub async fn harness_exec(
         {
             return Err("harness_exec: not a resolved harness CLI".to_string());
         }
-        exec_capture(&command, &args, cwd.as_deref())
+        let gateway_data_dir = if binary_provider.as_deref() == Some("opencode") {
+            Some(
+                app.path()
+                    .app_data_dir()
+                    .map_err(|error| error.to_string())?,
+            )
+        } else {
+            None
+        };
+        exec_capture(&command, &args, cwd.as_deref(), gateway_data_dir.as_deref())
     })
     .await
     .map_err(|e| e.to_string())?
 }
 
-fn exec_capture(command: &str, args: &[String], cwd: Option<&str>) -> Result<String, String> {
-    let output = exec_output(command, args, cwd, EXEC_TIMEOUT)?;
+fn exec_capture(
+    command: &str,
+    args: &[String],
+    cwd: Option<&str>,
+    gateway_data_dir: Option<&Path>,
+) -> Result<String, String> {
+    let output = exec_output_configured(command, args, cwd, EXEC_TIMEOUT, gateway_data_dir)?;
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     if output.status.success() || !stdout.trim().is_empty() {
         return Ok(stdout);
@@ -1342,12 +1371,23 @@ pub(crate) fn exec_output(
     cwd: Option<&str>,
     timeout: Duration,
 ) -> Result<std::process::Output, String> {
+    exec_output_configured(command, args, cwd, timeout, None)
+}
+
+fn exec_output_configured(
+    command: &str,
+    args: &[String],
+    cwd: Option<&str>,
+    timeout: Duration,
+    gateway_data_dir: Option<&Path>,
+) -> Result<std::process::Output, String> {
     let mut cmd = Command::new(command);
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     prepare_child(&mut cmd, command);
+    crate::gateway_profiles::apply(&mut cmd, gateway_data_dir, None)?;
     if let Some(dir) = cwd {
         let workdir = expand_home(dir);
         if workdir.is_dir() {
@@ -2026,7 +2066,12 @@ fn validate_harness_binary_version(provider: &str, path: &Path) -> Result<(), St
     if provider == "antigravity" {
         return Ok(());
     }
-    let version = exec_capture(&path.to_string_lossy(), &["--version".to_string()], None)?;
+    let version = exec_capture(
+        &path.to_string_lossy(),
+        &["--version".to_string()],
+        None,
+        None,
+    )?;
     let lower = version.to_ascii_lowercase();
     let has_version = is_supported_harness_version(&version);
     let provider_marker = match provider {
@@ -2145,6 +2190,12 @@ fn resolve_opencode() -> Option<PathBuf> {
     candidates.push(PathBuf::from("/snap/bin/opencode"));
     if let Some(from_shell) = which_via_login_shell("opencode") {
         candidates.push(from_shell);
+    }
+    #[cfg(target_os = "macos")]
+    if let Some(home) = &home {
+        candidates.push(
+            home.join("Library/Application Support/com.luxecode.desktop/engine/bin/opencode"),
+        );
     }
 
     first_binary(candidates)

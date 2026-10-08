@@ -8,7 +8,12 @@ import { AgentTranscript } from "./AgentTranscript";
 
 vi.mock("../model/transcriptActivity", async (original) => {
   const actual = await original<typeof activity>();
-  return { ...actual, groupTurnItems: vi.fn(actual.groupTurnItems) };
+  return {
+    ...actual,
+    groupTurnItems: vi.fn(actual.groupTurnItems),
+    turnCopyText: vi.fn(actual.turnCopyText),
+    activityStillRunning: vi.fn(actual.activityStillRunning),
+  };
 });
 vi.mock("./AgentMarkdown", () => ({
   AgentMarkdown: ({ text }: { text: string }) =>
@@ -104,6 +109,73 @@ it("regroups only the changing live turn, including after a tab revisit", async 
     );
   }
   expect(activity.groupTurnItems).not.toHaveBeenCalled();
+});
+
+it("skips unchanged visible props but renders changed output and callbacks", async () => {
+  const blocks: Block[] = [
+    { id: "u", role: "user", text: "Question", durationMs: 1000 },
+    { id: "a", role: "assistant", text: "Answer" },
+  ];
+  const onSaveNote = vi.fn();
+  const props = { blocks, visible: true, onSaveNote };
+  await act(async () => root.render(createElement(AgentTranscript, props)));
+  vi.mocked(activity.activityStillRunning).mockClear();
+  act(() => root.render(createElement(AgentTranscript, { ...props })));
+  expect(activity.activityStillRunning).not.toHaveBeenCalled();
+
+  const nextSaveNote = vi.fn();
+  act(() =>
+    root.render(
+      createElement(AgentTranscript, { ...props, onSaveNote: nextSaveNote }),
+    ),
+  );
+  expect(activity.activityStillRunning).toHaveBeenCalled();
+  vi.mocked(activity.activityStillRunning).mockClear();
+  act(() =>
+    root.render(
+      createElement(AgentTranscript, {
+        ...props,
+        blocks: [blocks[0], { ...blocks[1], text: "Updated answer" }],
+      }),
+    ),
+  );
+  expect(host.textContent).toContain("Updated answer");
+  expect(activity.activityStillRunning).toHaveBeenCalled();
+});
+
+it("does not rebuild completed reply copy text while the live turn streams", async () => {
+  const blocks: Block[] = [
+    { id: "u0", role: "user", text: "Earlier question", durationMs: 1000 },
+    { id: "a0", role: "assistant", text: "Earlier answer" },
+    { id: "u1", role: "user", text: "Current question" },
+    { id: "a1", role: "assistant", text: "Current answer" },
+  ];
+  await act(async () =>
+    root.render(createElement(AgentTranscript, { blocks, busy: true })),
+  );
+  vi.mocked(activity.turnCopyText).mockClear();
+  act(() =>
+    root.render(
+      createElement(AgentTranscript, {
+        blocks: [...blocks.slice(0, -1), { ...blocks[3], text: "More output" }],
+        busy: true,
+      }),
+    ),
+  );
+  expect(activity.turnCopyText).not.toHaveBeenCalled();
+
+  act(() =>
+    root.render(
+      createElement(AgentTranscript, {
+        blocks: blocks.map((block) =>
+          block.id === "a0" ? { ...block, text: "Corrected answer" } : block,
+        ),
+        busy: true,
+      }),
+    ),
+  );
+  expect(activity.turnCopyText).toHaveBeenCalledOnce();
+  expect(host.textContent).toContain("Corrected answer");
 });
 
 it("leaves offscreen messages unmeasured until the browser reveals their turn", () => {
