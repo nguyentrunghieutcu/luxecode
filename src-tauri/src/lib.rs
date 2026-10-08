@@ -10,6 +10,8 @@ pub mod control_cli;
 mod cursor_store;
 mod external_editor;
 mod fs;
+mod gateway;
+mod gateway_profiles;
 mod gitlab;
 mod harness;
 mod harness_updates;
@@ -23,6 +25,8 @@ mod macos;
 mod macos_background;
 mod mcp;
 mod menu;
+mod mono;
+mod mono_transcript;
 mod notes;
 mod notifications;
 mod pasteboard;
@@ -447,6 +451,10 @@ pub fn run() {
             harness_updates::harness_latest_version,
             harness_updates::harness_update_check_claim,
             harness_updates::harness_update,
+            gateway_profiles::gateway_profiles,
+            gateway_profiles::gateway_test,
+            gateway_profiles::gateway_create,
+            gateway_profiles::gateway_rotate_key,
             harness::provider_account_remove,
             account_identity::provider_account_identity,
             pi_usage::fetch_pi_usage,
@@ -465,6 +473,10 @@ pub fn run() {
             session_store::session_search,
             session_store::cancel_session_search,
             session_store::session_get,
+            mono_transcript::mono_session_get,
+            mono_transcript::mono_session_page,
+            mono_transcript::mono_session_upsert,
+            mono_transcript::mono_session_find,
             session_store::session_delete,
             session_store::session_set_archived,
             session_store::session_set_pinned,
@@ -480,6 +492,9 @@ pub fn run() {
             notes::notes_delete,
             notes::notes_save_image,
             notes::notes_image_path,
+            mono::mono_load,
+            mono::mono_read,
+            mono::mono_save,
             checkpoint::session_checkpoint_ensure,
             checkpoint::session_checkpoint_prepare,
             checkpoint::session_checkpoint_capture,
@@ -541,7 +556,7 @@ pub fn run() {
             project_logo::forget_logo_file,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building MonoCode");
+        .expect("error while building LuxeCode");
 
     app.run(|handle, event| match event {
         #[cfg(target_os = "macos")]

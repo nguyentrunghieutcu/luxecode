@@ -6,6 +6,9 @@ let onSseEvent: ((event: Record<string, unknown>) => void) | undefined;
 let finishPrompt:
   ((value: { status: number; body: string }) => void) | undefined;
 let promptStarted = false;
+const spawnChild = vi.fn(async () => {
+  onStdout?.("opencode server listening on http://127.0.0.1:4096");
+});
 
 const harnessHttp = vi.fn(
   async (input: {
@@ -37,9 +40,7 @@ vi.mock("../../core/child", () => ({
   killChild: async () => undefined,
   openHarnessSse: async () => undefined,
   resolveOpenCodeBinary: async () => ({ path: "/fake/opencode" }),
-  spawnChild: async () => {
-    onStdout?.("opencode server listening on http://127.0.0.1:4096");
-  },
+  spawnChild,
   unwatchChild: () => undefined,
   watchChild: (_id: string, stdout: (line: string) => void) => {
     onStdout = stdout;
@@ -102,10 +103,20 @@ beforeEach(() => {
   finishPrompt = undefined;
   promptStarted = false;
   harnessHttp.mockClear();
+  spawnChild.mockClear();
 });
 
 afterEach(async () => {
   await stopOpenCodeTextPrompt();
+});
+
+it("uses the requested gateway profile for auxiliary text generation", async () => {
+  const profileId = "11111111-1111-4111-8111-111111111111";
+  const result = runOpenCodeTextPrompt({ cwd: "/repo", model: `opencode:luxecode-${profileId}/coding`, prompt: "title" });
+  await waitFor(() => promptStarted, "gateway text prompt");
+  expect(spawnChild).toHaveBeenCalledWith("monocode-opencode-text", "/fake/opencode", expect.any(Array), "/repo", undefined, "opencode", profileId);
+  finishPrompt?.({ status: 200, body: JSON.stringify({ info: {}, parts: [{ type: "text", text: "A title" }] }) });
+  await expect(result).resolves.toBe("A title");
 });
 
 it("forwards only incremental OpenCode assistant text", async () => {

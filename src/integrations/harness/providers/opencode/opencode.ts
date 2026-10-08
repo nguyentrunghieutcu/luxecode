@@ -1,5 +1,13 @@
-import { modelContextWindow, nativeModelId } from "../../../../features/sessions/model/models";
-import type { RuntimeMode, TurnMetrics } from "../../../../features/sessions/model/session";
+import { TurnNotReadyError } from "../../core/types";
+import { gatewayProfileId } from "../../../../features/providers/model/gatewayProfiles";
+import {
+  modelContextWindow,
+  nativeModelId,
+} from "../../../../features/sessions/model/models";
+import type {
+  RuntimeMode,
+  TurnMetrics,
+} from "../../../../features/sessions/model/session";
 import { taskListFromToolInput } from "../../../../features/sessions/model/taskList";
 import {
   closeHarnessSse,
@@ -79,6 +87,7 @@ type PendingQuestion = {
 };
 
 type Live = {
+  gatewayProfileId?: string;
   client: OpenCodeClient;
   openCodeSessionId: string;
   cwd: string;
@@ -111,6 +120,9 @@ type Live = {
 type Resume = {
   sessionId: string;
   cwd: string;
+  gatewayProfileId?: string;
+  connectionBound?: boolean;
+  connectionError?: string;
 };
 
 const SERVER_TIMEOUT_MS = 30_000;
@@ -249,7 +261,7 @@ async function latestOpenCodeUserMessageId(live: Live): Promise<string> {
 
 export async function steerOpenCodeTurn(input: SteerTurnInput): Promise<void> {
   const live = liveByThread.get(input.sessionId);
-  if (!live?.activeTurn) throw new Error("No active turn to steer");
+  if (!live?.activeTurn) throw new TurnNotReadyError("No active turn to steer");
 
   const parsed = parseOpenCodeModelSlug(nativeModelId(input.model));
   if (!parsed) {
@@ -347,15 +359,32 @@ export function bindOpenCodeSession(
   threadId: string,
   providerSessionId: string,
   cwd: string,
+  _providerAccountId?: string,
+  model?: string,
 ): void {
   const sessionId = providerSessionId.trim();
   if (!threadId || !sessionId || !cwd.trim()) return;
-  resumeByThread.set(threadId, { sessionId, cwd });
+  const resume: Resume = { sessionId, cwd, connectionBound: !!model };
+  try {
+    resume.gatewayProfileId = model
+      ? gatewayProfileId(nativeModelId(model))
+      : undefined;
+  } catch (error) {
+    resume.connectionError =
+      error instanceof Error ? error.message : String(error);
+  }
+  resumeByThread.set(threadId, resume);
 }
 
 async function ensureLive(input: HarnessSessionInput): Promise<Live> {
+  const restored = resumeByThread.get(input.sessionId);
+  if (restored?.connectionError) throw new Error(restored.connectionError);
+  const profileId = gatewayProfileId(nativeModelId(input.model));
   const existing = liveByThread.get(input.sessionId);
   if (existing && existing.cwd === input.cwd) {
+    if (existing.gatewayProfileId !== profileId) {
+      throw new Error("Start a new conversation to switch between direct mode and gateway connections. The existing session remains unchanged.");
+    }
     existing.onEvent = input.onEvent;
     if (existing.runtimeMode !== input.runtimeMode) {
       await existing.client.updateSession(existing.openCodeSessionId, {
@@ -371,6 +400,9 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   }
 
   const resume = resumeByThread.get(input.sessionId);
+  if (resume?.connectionBound && resume.gatewayProfileId !== profileId) {
+    throw new Error("Start a new conversation to change the saved gateway connection; the existing session cannot resume through another gateway or direct mode.");
+  }
   const canResume = resume != null && resume.cwd === input.cwd;
   if (resume && resume.cwd !== input.cwd) {
     resumeByThread.delete(input.sessionId);
@@ -417,6 +449,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     input.cwd,
     undefined,
     "opencode",
+    profileId,
   );
 
   try {
@@ -439,6 +472,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     }
 
     const live: Live = {
+      gatewayProfileId: profileId,
       client,
       openCodeSessionId: openCodeSession.id,
       cwd: input.cwd,
@@ -470,6 +504,8 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     resumeByThread.set(input.sessionId, {
       sessionId: openCodeSession.id,
       cwd: input.cwd,
+      gatewayProfileId: profileId,
+      connectionBound: true,
     });
 
     await client.subscribeEvents(
@@ -703,7 +739,8 @@ async function handleEvent(
       const id =
         stringField(properties, "id") ?? stringField(properties, "requestID");
       if (!id) break;
-      if ([...live.approvals.values()].some((pending) => pending.id === id)) break;
+      if ([...live.approvals.values()].some((pending) => pending.id === id))
+        break;
       const permission = stringField(properties, "permission") ?? "tool";
       const patterns = Array.isArray(properties.patterns)
         ? properties.patterns.filter(
@@ -789,7 +826,8 @@ async function handleEvent(
       const id =
         stringField(properties, "id") ?? stringField(properties, "requestID");
       if (!id) break;
-      if ([...live.questions.values()].some((pending) => pending.id === id)) break;
+      if ([...live.questions.values()].some((pending) => pending.id === id))
+        break;
       const questions = questionsFromUnknown(properties);
       const uiId = live.nextApprovalUiId++;
       const pending = waitQuestion(live, uiId, id, questions);
@@ -1000,10 +1038,17 @@ function bindSubagentSession(
   if (live.subagentSessions.get(sessionId) === callId) return;
   live.subagentSessions.set(sessionId, callId);
   const model = live.subagentModels.get(sessionId);
-  if (model) live.onEvent({ type: "tool.updated", callId, kind: "agent", agentModel: model });
+  if (model)
+    live.onEvent({
+      type: "tool.updated",
+      callId,
+      kind: "agent",
+      agentModel: model,
+    });
   const backlog = live.pendingSubagent.get(sessionId);
   live.pendingSubagent.delete(sessionId);
-  for (const part of backlog ?? []) emitSubagentStep(live, callId, sessionId, part);
+  for (const part of backlog ?? [])
+    emitSubagentStep(live, callId, sessionId, part);
 }
 
 function handleSubagentEvent(
@@ -1016,7 +1061,11 @@ function handleSubagentEvent(
   let ancestor: string | undefined = sessionId;
   const visited = new Set<string>();
   while (ancestor && !visited.has(ancestor)) {
-    if (ancestor === live.openCodeSessionId || live.subagentSessions.has(ancestor)) break;
+    if (
+      ancestor === live.openCodeSessionId ||
+      live.subagentSessions.has(ancestor)
+    )
+      break;
     visited.add(ancestor);
     ancestor = live.sessionParentById.get(ancestor);
   }
@@ -1028,14 +1077,27 @@ function handleSubagentEvent(
     const agent = stringField(info, "agent");
     const model = stringField(info, "modelID");
     // Nested agents share the outer trail, but have their own model.
-    if (role === "assistant" && model && !(agent && KNOWN_HIDDEN_AGENTS.has(agent)) &&
-        live.sessionParentById.get(sessionId) === live.openCodeSessionId) {
+    if (
+      role === "assistant" &&
+      model &&
+      !(agent && KNOWN_HIDDEN_AGENTS.has(agent)) &&
+      live.sessionParentById.get(sessionId) === live.openCodeSessionId
+    ) {
       live.subagentModels.set(sessionId, model);
       const callId = live.subagentSessions.get(sessionId);
-      if (callId) live.onEvent({ type: "tool.updated", callId, kind: "agent", agentModel: model });
+      if (callId)
+        live.onEvent({
+          type: "tool.updated",
+          callId,
+          kind: "agent",
+          agentModel: model,
+        });
     }
     if (id && (role === "user" || role === "assistant")) {
-      live.messageRoleById.set(id, agent && KNOWN_HIDDEN_AGENTS.has(agent) ? "hidden" : role);
+      live.messageRoleById.set(
+        id,
+        agent && KNOWN_HIDDEN_AGENTS.has(agent) ? "hidden" : role,
+      );
       // Message metadata may follow the first part on a resumed stream.
       for (const part of live.partById.values()) {
         if (part.messageID === id) mirrorSubagentPart(live, sessionId, part);
@@ -1043,12 +1105,17 @@ function handleSubagentEvent(
     }
     return;
   }
-  let part = type === "message.part.updated" ? parsePart(properties.part) : null;
+  let part =
+    type === "message.part.updated" ? parsePart(properties.part) : null;
   if (type === "message.part.delta") {
     const id = stringField(properties, "partID");
     const existing = id ? live.partById.get(id) : undefined;
     const delta = streamTextDelta(properties.delta);
-    if (existing && delta && (existing.type === "text" || existing.type === "reasoning")) {
+    if (
+      existing &&
+      delta &&
+      (existing.type === "text" || existing.type === "reasoning")
+    ) {
       part = { ...existing, text: (existing.text ?? "") + delta };
     }
   }
@@ -1072,7 +1139,8 @@ function mirrorSubagentPart(
     emitSubagentStep(live, callId, sessionId, part);
     return;
   }
-  if (part.type !== "tool" && part.type !== "text" && part.type !== "reasoning") return;
+  if (part.type !== "tool" && part.type !== "text" && part.type !== "reasoning")
+    return;
   const backlog = live.pendingSubagent.get(sessionId) ?? [];
   const index = backlog.findIndex((entry) => entry.id === part.id);
   if (index >= 0) backlog[index] = part;
@@ -1327,11 +1395,13 @@ function unsupportedFileMediaType(error: unknown): string | undefined {
 }
 
 async function assertOpenCodeVersion(path: string, cwd: string): Promise<void> {
-  const output = await execChild(path, ["--version"], cwd, "opencode").catch(() => "");
+  const output = await execChild(path, ["--version"], cwd, "opencode").catch(
+    () => "",
+  );
   const version = parseOpenCodeVersion(output);
   if (!version) {
     throw new Error(
-      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
+      `Unable to determine OpenCode version. LuxeCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
     );
   }
   if (compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {

@@ -1,4 +1,5 @@
-import { modelsFor } from "../../../../features/sessions/model/models";
+import { preferredModelId, modelsFor } from "../../../../features/sessions/model/models";
+import { gatewayProfileId } from "../../../../features/providers/model/gatewayProfiles";
 import type { TurnIntent } from "../../../../features/sessions/model/session";
 import {
   execChild,
@@ -195,6 +196,7 @@ async function startLive(
     cwd,
     undefined,
     "opencode",
+    gatewayProfileId(`${model.providerID}/${model.modelID}`),
   );
 
   try {
@@ -371,7 +373,7 @@ function pickTextModel(requested?: string): {
   providerID: string;
   modelID: string;
 } {
-  const selected = requested?.trim();
+  const selected = requested?.trim() || preferredModelId("opencode");
   if (selected) {
     const modelSlug = selected.startsWith("opencode:")
       ? selected.slice("opencode:".length)

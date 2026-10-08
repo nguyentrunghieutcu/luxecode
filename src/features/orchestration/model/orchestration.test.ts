@@ -23,7 +23,7 @@ function setup() {
     }),
     load: vi.fn(async (id: string) => saved.get(id) ?? null),
     enable: vi.fn(
-      async () => "/Applications/MonoCode.app/Contents/MacOS/monocode",
+      async () => "/Applications/LuxeCode.app/Contents/MacOS/monocode",
     ),
     disable: vi.fn(async () => {}),
     scopes: vi.fn(async (cwd: string, files: string[]) =>
@@ -1215,19 +1215,19 @@ describe("local orchestration", () => {
   });
   it("quotes the control path only when the shell needs it", () => {
     expect(
-      shellPath("/Applications/MonoCode.app/Contents/MacOS/monocode"),
-    ).toBe("/Applications/MonoCode.app/Contents/MacOS/monocode");
-    expect(shellPath("/Users/a b/MonoCode")).toBe("'/Users/a b/MonoCode'");
-    expect(shellPath("C:/Program Files/MonoCode/monocode.exe")).toBe(
-      '"C:/Program Files/MonoCode/monocode.exe"',
+      shellPath("/Applications/LuxeCode.app/Contents/MacOS/monocode"),
+    ).toBe("/Applications/LuxeCode.app/Contents/MacOS/monocode");
+    expect(shellPath("/Users/a b/LuxeCode")).toBe("'/Users/a b/LuxeCode'");
+    expect(shellPath("C:/Program Files/LuxeCode/monocode.exe")).toBe(
+      '"C:/Program Files/LuxeCode/monocode.exe"',
     );
     expect(shellPath("C:\\Tools\\monocode.exe")).toBe(
       "C:\\Tools\\monocode.exe",
     );
     // A backslash escapes in a POSIX shell, so bare would rewrite the path.
-    expect(shellPath("/Users/a\\b/MonoCode")).toBe("'/Users/a\\b/MonoCode'");
-    expect(shellPath("/Users/it's/MonoCode")).toBe(
-      "'/Users/it'\\''s/MonoCode'",
+    expect(shellPath("/Users/a\\b/LuxeCode")).toBe("'/Users/a\\b/LuxeCode'");
+    expect(shellPath("/Users/it's/LuxeCode")).toBe(
+      "'/Users/it'\\''s/LuxeCode'",
     );
   });
   it("treats an action named after an Object member as unknown", async () => {

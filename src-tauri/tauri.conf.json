@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MonoCode",
-  "version": "0.7.0",
-  "identifier": "com.monocode.desktop",
+  "productName": "LuxeCode",
+  "version": "0.8.0",
+  "identifier": "com.luxecode.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "MonoCode",
+        "title": "LuxeCode",
         "width": 1280,
         "height": 800,
         "minWidth": 800,

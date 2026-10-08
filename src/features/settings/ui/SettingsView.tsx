@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ConnectionsSettings } from "../../connections/ui/ConnectionsSettings";
+import { GatewaySettings } from "./GatewaySettings";
 import { ask } from "@tauri-apps/plugin-dialog";
 import {
   ArrowDownCircle,
@@ -53,6 +54,7 @@ import {
   applyChatBackgroundEmptyOpacity,
   applyChatBackgroundSessionOpacity,
   applyChatBackgroundScope,
+  applyDiffPalette,
   applyAccentColor,
   applyBodyGlass,
   applySidebarBlur,
@@ -75,6 +77,7 @@ import {
   loadChatBackgroundPath,
   loadChatBackgroundSessionOpacity,
   loadChatBackgroundScope,
+  loadDiffPalette,
   loadNewThreadBackgroundEffect,
   loadThemeDarkLightness,
   loadThemePreference,
@@ -90,6 +93,7 @@ import {
   saveChatBackgroundPath,
   saveChatBackgroundSessionOpacity,
   saveChatBackgroundScope,
+  saveDiffPalette,
   setNewThreadBackgroundEffect,
   saveThemeDarkLightness,
   saveThemePreference,
@@ -122,6 +126,8 @@ import {
   THEME_SATURATION_MIN,
   type ThemePreference,
   type ChatBackgroundScope,
+  DIFF_PALETTE_DEFAULT,
+  type DiffPalette,
   NEW_THREAD_BACKGROUND_EFFECTS,
   NEW_THREAD_BACKGROUND_EFFECT_LABELS,
   NEW_THREAD_BACKGROUND_EFFECT_DESCRIPTIONS,
@@ -287,6 +293,18 @@ import {
 import { useTabGroupLogos } from "../../projects/hooks/useTabGroupLogos";
 import { ProjectLogoIcon } from "../../projects/ui/ProjectLogoIcon";
 import { ProjectMascot } from "../../projects/ui/ProjectMascot";
+import { PixelMascot } from "../../projects/ui/PixelMascot";
+import {
+  defaultMonoName,
+  listMonos,
+  monoLook,
+  monoProjectsPhrase,
+  monosSnapshot,
+  subscribeMonos,
+  type Mono,
+} from "../../monos/model/mono";
+import { resetMonoDefaults } from "../../monos/model/monoFiles";
+import { ConfirmReset } from "../../monos/ui/ConfirmReset";
 import {
   filterKeybindings,
   currentKeybindings,
@@ -302,6 +320,7 @@ import {
   loadLiveAgentsEnabled,
   loadModelControls,
   loadNotesEnabled,
+  loadMonosEnabled,
   loadKeybindingOverrides,
   loadQuickComposerEnabled,
   loadQuickComposerShortcut,
@@ -318,6 +337,8 @@ import {
   saveLiveAgentsEnabled,
   saveModelControls,
   saveNotesEnabled,
+  saveMonosEnabled,
+  subscribeMonosEnabled,
   saveKeybindingOverride,
   validateKeybindingShortcut,
   saveQuickComposerEnabled,
@@ -553,6 +574,9 @@ export function SettingsView({
               ) : null}
               {section === "chat" ? <ChatPage /> : null}
               {section === "keybindings" ? <KeybindingsPage /> : null}
+              {section === "monos" ? (
+                <MonosPage />
+              ) : null}
               {section === "mcp" ? (
                 <McpSettings cwd={cwd} recents={recents} />
               ) : null}
@@ -809,7 +833,7 @@ function GeneralPage({
     <>
       <Group
         title="Alerts"
-        description="How MonoCode reaches you while you are looking somewhere else."
+        description="How LuxeCode reaches you while you are looking somewhere else."
       >
         <Row
           id="sounds"
@@ -825,7 +849,7 @@ function GeneralPage({
         <Row
           id="notifications"
           label="Notifications"
-          description="Notify when a reminder is due, or when an agent finishes or needs input in another session or while MonoCode is in the background. Click the notification to open that session."
+          description="Notify when a reminder is due, or when an agent finishes or needs input in another session or while LuxeCode is in the background. Click the notification to open that session."
         >
           {notificationsEnabled && notificationPermission === "denied" ? (
             <NotificationsBlocked />
@@ -884,7 +908,7 @@ function GeneralPage({
           <Row
             id="quick-composer"
             label="Quick composer"
-            description={`Press ${quickComposerShortcutLabel(loadQuickComposerShortcut())} in any app to float a prompt over it and start a session without switching to MonoCode. Change the shortcut in Keybindings. Return starts it in the background; ⌘Return starts it and brings the session forward.`}
+            description={`Press ${quickComposerShortcutLabel(loadQuickComposerShortcut())} in any app to float a prompt over it and start a session without switching to LuxeCode. Change the shortcut in Keybindings. Return starts it in the background; ⌘Return starts it and brings the session forward.`}
           >
             {quickComposerError ? (
               <span className="text-[12px] text-content/45">
@@ -1263,7 +1287,7 @@ function GithubSettings() {
   }, [checkStatus]);
 
   const description = status?.connected
-    ? "GitHub CLI is installed and authenticated. MonoCode uses it for GitHub inbox items."
+    ? "GitHub CLI is installed and authenticated. LuxeCode uses it for GitHub inbox items."
     : status?.installed
       ? "Run gh auth login in a terminal, complete the sign-in flow, then check again."
       : "Install GitHub CLI from cli.github.com, run gh auth login in a terminal, then check again.";
@@ -1754,7 +1778,7 @@ function UpdateRow({
             ? "You're on the latest version."
             : snapshot.phase === "error"
               ? (snapshot.error ?? "Update check failed.")
-              : "MonoCode updates itself from the release feed.";
+              : "LuxeCode updates itself from the release feed.";
 
   return (
     <Row
@@ -1823,6 +1847,7 @@ function useAppearanceSettings(
     useState(loadChatBackgroundSessionOpacity);
   const [chatBackgroundScope, setChatBackgroundScope] =
     useState<ChatBackgroundScope>(loadChatBackgroundScope);
+  const [diffPalette, setDiffPalette] = useState<DiffPalette>(loadDiffPalette);
   const [newThreadBackgroundEffect, setBackgroundEffect] =
     useState<NewThreadBackgroundEffect>(loadNewThreadBackgroundEffect);
   const [chatBackgroundBusy, setChatBackgroundBusy] = useState(false);
@@ -1940,6 +1965,12 @@ function useAppearanceSettings(
     setChatBackgroundScope(next);
   }, []);
 
+  const onDiffPalette = useCallback((next: DiffPalette) => {
+    applyDiffPalette(next);
+    saveDiffPalette(next);
+    setDiffPalette(next);
+  }, []);
+
   const onNewThreadBackgroundEffect = useCallback(
     (next: NewThreadBackgroundEffect) => {
       setNewThreadBackgroundEffect(next);
@@ -1979,6 +2010,7 @@ function useAppearanceSettings(
       Math.round(CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT * 100),
     );
     onChatBackgroundScope(CHAT_BACKGROUND_SCOPE_DEFAULT);
+    onDiffPalette(DIFF_PALETTE_DEFAULT);
     onNewThreadBackgroundEffect(NEW_THREAD_BACKGROUND_EFFECT_DEFAULT);
     if (chatBackgroundPath) void onClearChatBackground();
     onUiScale(Math.round(UI_SCALE_DEFAULT * 100));
@@ -1990,6 +2022,7 @@ function useAppearanceSettings(
     onChatBackgroundEmptyOpacity,
     onChatBackgroundSessionOpacity,
     onChatBackgroundScope,
+    onDiffPalette,
     onNewThreadBackgroundEffect,
     onClearChatBackground,
     onAccentColor,
@@ -2016,6 +2049,7 @@ function useAppearanceSettings(
     chatBackgroundEmptyOpacity,
     chatBackgroundSessionOpacity,
     chatBackgroundScope,
+    diffPalette,
     newThreadBackgroundEffect,
     chatBackgroundBusy,
     chatBackgroundError,
@@ -2034,6 +2068,7 @@ function useAppearanceSettings(
     onChatBackgroundEmptyOpacity,
     onChatBackgroundSessionOpacity,
     onChatBackgroundScope,
+    onDiffPalette,
     onNewThreadBackgroundEffect,
     onUiScale,
     onCollapsedProjectRailMode,
@@ -2075,6 +2110,22 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
           <AccentColorPicker
             value={appearance.accentColor}
             onChange={appearance.onAccentColor}
+          />
+        </Row>
+        <Row
+          id="diff-colors"
+          label="Diff colors"
+          description="Colors for added and removed lines. Colorblind and High contrast use blue and orange instead of green and red; High contrast adds stronger tints and text."
+        >
+          <Segmented
+            label="Diff colors"
+            value={appearance.diffPalette}
+            options={[
+              { value: "default", label: "Default" },
+              { value: "colorblind", label: "Colorblind" },
+              { value: "high-contrast", label: "High contrast" },
+            ]}
+            onChange={appearance.onDiffPalette}
           />
         </Row>
       </Group>
@@ -2139,7 +2190,7 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
         description={
           glassDisabled
             ? "Light mode always uses an opaque window, so these are off. Your dark-mode values are preserved."
-            : "How much of the desktop shows through MonoCode. Blur costs more to composite the higher it goes."
+            : "How much of the desktop shows through LuxeCode. Blur costs more to composite the higher it goes."
         }
       >
         <Row
@@ -2734,7 +2785,10 @@ function binaryInspectionError(
   inspection: HarnessBinaryInspection,
 ): string | null {
   if (inspection.error) return inspection.error;
-  if (provider === "codex" && !/^codex-cli\s+\d+\.\d+\.\d+/.test(inspection.version ?? "")) {
+  if (
+    provider === "codex" &&
+    !/^codex-cli\s+\d+\.\d+\.\d+/.test(inspection.version ?? "")
+  ) {
     return "Codex CLI returned an invalid version.";
   }
   if (provider === "opencode") {
@@ -2868,7 +2922,9 @@ function ProviderBinaryControl({
           setEditing(false);
         }}
         className={`grid size-6 place-items-center rounded hover:bg-content/10 focus-visible:outline-2 focus-visible:outline-accent ${
-          restartRequired ? "text-amber-300" : "text-content/35 hover:text-content"
+          restartRequired
+            ? "text-amber-300"
+            : "text-content/35 hover:text-content"
         }`}
       >
         <FolderOpen className="size-3.5" strokeWidth={1.75} />
@@ -2945,7 +3001,8 @@ function ProviderBinaryControl({
                 className="mt-1.5 h-8 w-full rounded-md border border-content/10 bg-content/[0.04] px-2 font-mono text-[11px] text-content outline-none placeholder:font-sans placeholder:text-content/35 focus:border-accent/45 disabled:opacity-50"
               />
               <p className="mt-1.5 text-[10px] text-content/40">
-                Enter the absolute path to the CLI executable. Changes apply after restarting MonoCode.
+                Enter the absolute path to the CLI executable. Changes apply
+                after restarting LuxeCode.
               </p>
               {error ? (
                 <span
@@ -2984,31 +3041,33 @@ function ProviderBinaryControl({
               <div className="mt-2 rounded-md border border-content/10 bg-content/[0.03] px-2.5 py-2">
                 <span className="block max-h-12 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] text-content/65">
                   {inspection?.path ??
-                    (error ? "CLI could not be resolved" : "Checking the selected CLI…")}
+                    (error
+                      ? "CLI could not be resolved"
+                      : "Checking the selected CLI…")}
                 </span>
                 <span className="mt-1 block max-h-10 overflow-y-auto whitespace-pre-wrap break-words text-[10px] text-content/40">
                   {inspection?.version ??
                     (error ? "Retry to check this CLI" : "Checking version…")}
                 </span>
               </div>
-               {error ? (
-                 <span
-                   role="alert"
-                   title={error}
-                   className="mt-1.5 block max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-red-400"
-                 >
-                   {error}
-                 </span>
-               ) : null}
-               {revealError ? (
-                 <span
-                   role="alert"
-                   className="mt-1.5 block max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-red-400"
-                 >
-                   Could not open the CLI location: {revealError}
-                 </span>
-               ) : null}
-               <div className="mt-3 flex justify-end gap-2">
+              {error ? (
+                <span
+                  role="alert"
+                  title={error}
+                  className="mt-1.5 block max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-red-400"
+                >
+                  {error}
+                </span>
+              ) : null}
+              {revealError ? (
+                <span
+                  role="alert"
+                  className="mt-1.5 block max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-red-400"
+                >
+                  Could not open the CLI location: {revealError}
+                </span>
+              ) : null}
+              <div className="mt-3 flex justify-end gap-2">
                 {error ? (
                   <SecondaryButton
                     disabled={working}
@@ -3030,7 +3089,9 @@ function ProviderBinaryControl({
                     if (inspection) {
                       void revealPath(inspection.path).catch((cause) => {
                         setRevealError(
-                          cause instanceof Error ? cause.message : String(cause),
+                          cause instanceof Error
+                            ? cause.message
+                            : String(cause),
                         );
                       });
                     }
@@ -3177,6 +3238,14 @@ function ProvidersPage({
     <>
       <ProviderAccountsSettings />
 
+      <Group
+        id="9router-gateway"
+        title="9router gateway"
+        description="Connect upstream accounts in 9router, enable Require API Key, then use a dedicated LuxeCode key here. No upstream login in OpenCode is required. Gateway errors never fall back to direct mode."
+      >
+        <GatewaySettings />
+      </Group>
+
       <UsageDisplaySettings />
 
       <Group
@@ -3192,8 +3261,8 @@ function ProvidersPage({
         }
         description={
           project
-            ? `These defaults apply to ${projectName(project)} only. A provider with Show in picker off is also kept out of new conversations started in this project. CLI paths remain global for MonoCode.`
-            : "A provider is listed as installed once its CLI is found on your PATH. Uninstalled CLIs stay listed but are left out of the model picker, as are installed ones with Show in picker off. The model beside a provider is what its new conversations start with; Use by default picks the provider itself. CLI paths are global for MonoCode and apply to every project."
+            ? `These defaults apply to ${projectName(project)} only. A provider with Show in picker off is also kept out of new conversations started in this project. CLI paths remain global for LuxeCode.`
+            : "A provider is listed as installed once its CLI is found on your PATH. Uninstalled CLIs stay listed but are left out of the model picker, as are installed ones with Show in picker off. The model beside a provider is what its new conversations start with; Use by default picks the provider itself. CLI paths are global for LuxeCode and apply to every project."
         }
       >
         {HARNESSES.map((harness) => {
@@ -3897,6 +3966,90 @@ function formatDate(value: number): string {
   } catch {
     return "";
   }
+}
+
+/** Monos on or off, and each Mono the user has. */
+function MonosPage() {
+  const enabled = useSyncExternalStore(
+    subscribeMonosEnabled,
+    loadMonosEnabled,
+    () => true,
+  );
+  const snapshot = useSyncExternalStore(subscribeMonos, monosSnapshot);
+  const monos = useMemo(() => listMonos(), [snapshot]);
+
+  return (
+    <>
+      <Group title="Monos">
+        <Row
+          id="monos-enabled"
+          label="Show monos"
+          description="Agents of your own on the project rail. Each works on the projects you give it, remembers what matters and picks up habits it runs on its own. Turn this off to hide them."
+        >
+          <Toggle label="Show monos" on={enabled} onChange={saveMonosEnabled} />
+        </Row>
+      </Group>
+      <Group
+        id="mono-list"
+        title="Your monos"
+        description="Add one with the plus beside Monos on the rail. Choose its projects from its details."
+      >
+        {monos.length ? (
+          monos.map((mono) => <MonoRow key={mono.id} mono={mono} />)
+        ) : (
+          <p className="px-4 py-3.5 text-[12px] text-content/45">
+            No monos yet.
+          </p>
+        )}
+      </Group>
+    </>
+  );
+}
+
+function MonoRow({ mono }: { mono: Mono }) {
+  const look = monoLook(mono);
+  return (
+    <Row
+      label={
+        <span className="flex min-w-0 items-center gap-2">
+          <PixelMascot
+            name={look.mascot}
+            color={look.color}
+            still
+            className="size-4 shrink-0"
+          />
+          <span className="truncate">{look.name}</span>
+        </span>
+      }
+      description={
+        look.projects.length
+          ? `Works on ${monoProjectsPhrase(look.projects)}`
+          : "No projects yet"
+      }
+    >
+      <ConfirmReset
+        label="Reset Mono"
+        title={`Reset ${look.name} to its defaults?`}
+        body={`Its soul goes back to the default and its name to ${defaultMonoName(look.mascot)}. Changes to its soul can't be recovered.`}
+        kept="Its conversation, projects, memory and habits will be kept."
+        failure="Could not reset the Mono."
+        onConfirm={() => resetMonoDefaults(mono.id)}
+      >
+        {(open, ref) => (
+          <button
+            ref={ref}
+            type="button"
+            title="Reset to defaults"
+            aria-label={`Reset ${look.name} to defaults`}
+            onClick={open}
+            className="grid size-7 place-items-center rounded-md text-content/40 transition-transform duration-150 hover:bg-content/10 hover:text-content active:scale-[0.96]"
+          >
+            <RotateCcw className="size-3.5" strokeWidth={1.75} />
+          </button>
+        )}
+      </ConfirmReset>
+    </Row>
+  );
 }
 
 function PageHeader({

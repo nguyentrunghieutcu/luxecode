@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
+import { resolveCodexBinary } from "../../../integrations/harness/core/child";
 import type { HarnessId } from "../../sessions/model/session";
+import { runtimeProviderBinaryPath } from "./providerBinaryPaths";
 import {
   announceHarnessUpdated,
+  fetchLatestHarnessVersion,
   findHarnessUpdates,
   onHarnessUpdated,
 } from "./harnessUpdates";
@@ -28,6 +32,13 @@ const events = vi.hoisted(() => {
   };
 });
 vi.mock("@tauri-apps/api/event", () => events);
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+vi.mock("../../../integrations/harness/core/child", () => ({
+  resolveCodexBinary: vi.fn(),
+}));
+vi.mock("./providerBinaryPaths", () => ({
+  runtimeProviderBinaryPath: vi.fn(() => null),
+}));
 
 const INSTALLED: Partial<Record<HarnessId, string>> = {
   claude: "2.1.284 (Claude Code)",
@@ -55,6 +66,46 @@ function find(harnesses: HarnessId[]) {
 }
 
 describe("harness update check", () => {
+  it("checks the resolved Codex binary and its runtime override before offering updates", async () => {
+    const path =
+      "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex";
+    vi.mocked(resolveCodexBinary).mockResolvedValue({ path });
+    vi.mocked(runtimeProviderBinaryPath).mockReturnValue(path);
+    vi.mocked(invoke).mockRejectedValue(
+      new Error("Codex is bundled with ChatGPT.app. Update that application."),
+    );
+    try {
+      expect(
+        await findHarnessUpdates({
+          harnesses: ["codex"],
+          installedVersion: async () => "codex-cli 0.160.0",
+          latestVersion: fetchLatestHarnessVersion,
+        }),
+      ).toEqual([]);
+      expect(invoke).toHaveBeenCalledWith("harness_latest_version", {
+        provider: "codex",
+        command: path,
+        binaryPath: path,
+      });
+    } finally {
+      vi.mocked(runtimeProviderBinaryPath).mockReturnValue(null);
+    }
+  });
+
+  it("still offers npm release updates for standalone Codex", async () => {
+    vi.mocked(resolveCodexBinary).mockResolvedValue({
+      path: "/opt/homebrew/bin/codex",
+    });
+    vi.mocked(invoke).mockResolvedValue("0.160.1");
+    expect(
+      await findHarnessUpdates({
+        harnesses: ["codex"],
+        installedVersion: async () => "codex-cli 0.160.0",
+        latestVersion: fetchLatestHarnessVersion,
+      }),
+    ).toEqual([{ harness: "codex", installed: "0.160.0", latest: "0.160.1" }]);
+  });
+
   it("reports only harnesses behind the published release", async () => {
     expect(await find(["claude", "codex", "opencode"])).toEqual([
       {
